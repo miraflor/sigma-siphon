@@ -1,0 +1,50 @@
+areas:
+  metro_manila:
+    name: Metro Manila
+    kind: metro
+    bbox: [120.85, 14.30, 121.20, 14.90]
+    boundary: null
+  metro_cebu:
+    name: Metro Cebu
+    kind: metro
+    bbox: [123.70, 10.10, 124.10, 10.60]
+    boundary: null
+  metro_davao:
+    name: Metro Davao
+    kind: metro
+    bbox: [125.20, 6.85, 125.80, 7.40]
+    boundary: null
+
+  ncr_caloocan: {name: Caloocan, kind: huc, psgc_code: "1380100000", bbox: [120.86088, 14.54280, 121.08372, 14.75985], boundary: null}
+  ncr_las_pinas: {name: "Las Piñas", kind: huc, psgc_code: "1380200000", bbox: [120.87058, 14.37208, 121.09324, 14.58913], boundary: null}
+  ncr_makati: {name: Makati, kind: huc, psgc_code: "1380300000", bbox: [120.90975, 14.44827, 121.13250, 14.66532], boundary: null}
+  ncr_malabon: {name: Malabon, kind: huc, psgc_code: "1380400000", bbox: [120.83970, 14.54933, 121.06255, 14.76638], boundary: null}
+  ncr_mandaluyong: {name: Mandaluyong, kind: huc, psgc_code: "1380500000", bbox: [120.92232, 14.46912, 121.14508, 14.68617], boundary: null}
+  ncr_manila: {name: Manila, kind: huc, psgc_code: "1380600000", bbox: [120.86958, 14.48221, 121.09236, 14.69926], boundary: null}
+  ncr_marikina: {name: Marikina, kind: huc, psgc_code: "1380700000", bbox: [120.98794, 14.52458, 121.21077, 14.74163], boundary: null}
+  ncr_muntinlupa: {name: Muntinlupa, kind: huc, psgc_code: "1380800000", bbox: [120.93362, 14.28074, 121.15620, 14.49779], boundary: null}
+  ncr_navotas: {name: Navotas, kind: huc, psgc_code: "1380900000", bbox: [120.83655, 14.54866, 121.05939, 14.76571], boundary: null}
+  ncr_paranaque: {name: "Parañaque", kind: huc, psgc_code: "1381000000", bbox: [120.90344, 14.37510, 121.12611, 14.59215], boundary: null}
+  ncr_pasay: {name: Pasay, kind: huc, psgc_code: "1381100000", bbox: [120.88328, 14.43517, 121.10602, 14.65222], boundary: null}
+  ncr_pasig: {name: Pasig, kind: huc, psgc_code: "1381200000", bbox: [120.96986, 14.45096, 121.19261, 14.66801], boundary: null}
+  ncr_quezon_city: {name: "Quezon City", kind: huc, psgc_code: "1381300000", bbox: [120.93720, 14.54247, 121.16004, 14.75952], boundary: null}
+  ncr_san_juan: {name: "San Juan", kind: huc, psgc_code: "1381400000", bbox: [120.91865, 14.49622, 121.14145, 14.71326], boundary: null}
+  ncr_taguig: {name: Taguig, kind: huc, psgc_code: "1381500000", bbox: [120.96305, 14.41810, 121.18576, 14.63515], boundary: null}
+  ncr_valenzuela: {name: Valenzuela, kind: huc, psgc_code: "1381600000", bbox: [120.85801, 14.58317, 121.08089, 14.80021], boundary: null}
+  benguet_baguio: {name: Baguio, kind: huc, psgc_code: "1430300000", bbox: [120.48102, 16.30348, 120.70577, 16.52053], boundary: null}
+  pampanga_angeles: {name: Angeles, kind: huc, psgc_code: "0330100000", bbox: [120.47624, 15.03144, 120.69959, 15.24849], boundary: null}
+  zambales_olongapo: {name: Olongapo, kind: huc, psgc_code: "0331400000", bbox: [120.17201, 14.72294, 120.39503, 14.93999], boundary: null}
+  quezon_lucena: {name: Lucena, kind: huc, psgc_code: "0431200000", bbox: [121.50312, 13.81752, 121.72524, 14.03457], boundary: null}
+  palawan_puerto_princesa: {name: "Puerto Princesa", kind: huc, psgc_code: "1731500000", bbox: [118.46161, 9.42107, 119.00847, 10.05413], boundary: null}
+  iloilo_iloilo: {name: Iloilo, kind: huc, psgc_code: "0631000000", bbox: [122.45891, 10.59415, 122.67832, 10.81120], boundary: null}
+  negros_occidental_bacolod: {name: Bacolod, kind: huc, psgc_code: "1830200000", bbox: [122.84168, 10.56776, 123.06107, 10.78481], boundary: null}
+  cebu_cebu: {name: Cebu, kind: huc, psgc_code: "0730600000", bbox: [123.78354, 10.20103, 124.00268, 10.41808], boundary: null}
+  cebu_lapu_lapu: {name: "Lapu-Lapu", kind: huc, psgc_code: "0731100000", bbox: [123.83925, 10.20415, 124.05839, 10.42120], boundary: null}
+  cebu_mandaue: {name: Mandaue, kind: huc, psgc_code: "0731300000", bbox: [123.83316, 10.21838, 124.05230, 10.43543], boundary: null}
+  leyte_tacloban: {name: Tacloban, kind: huc, psgc_code: "0831600000", bbox: [124.89823, 11.13450, 125.11805, 11.35155], boundary: null}
+  zamboanga_del_sur_zamboanga: {name: Zamboanga, kind: huc, psgc_code: "0931700000", bbox: [121.82300, 6.70564, 122.32973, 7.10356], boundary: null}
+  misamis_oriental_cagayan_de_oro: {name: "Cagayan de Oro", kind: huc, psgc_code: "1030500000", bbox: [124.46049, 8.33079, 124.82378, 8.62019], boundary: null}
+  lanao_del_norte_iligan: {name: Iligan, kind: huc, psgc_code: "1030900000", bbox: [124.07777, 8.08346, 124.40453, 8.37286], boundary: null}
+  davao_del_sur_davao: {name: Davao, kind: huc, psgc_code: "1130700000", bbox: [125.29162, 6.79323, 125.92525, 7.33586], boundary: null}
+  south_cotabato_general_santos: {name: "General Santos", kind: huc, psgc_code: "1230800000", bbox: [124.99103, 5.96763, 125.35240, 6.25703], boundary: null}
+  agusan_del_norte_butuan: {name: Butuan, kind: huc, psgc_code: "1630400000", bbox: [125.37326, 8.80363, 125.70063, 9.09303], boundary: null}
