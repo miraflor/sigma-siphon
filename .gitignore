@@ -11,3 +11,7 @@ output/
 *.egg-info/
 dist/
 build/
+
+# Local boundary-build source inputs
+/data/source/
+/data/boundaries/PHL_ADM3_simplified.geojson
