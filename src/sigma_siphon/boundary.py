@@ -1,12 +1,57 @@
 from __future__ import annotations
 
-import geopandas as gpd
-from shapely.geometry import box
-from shapely.ops import unary_union
+import hashlib
+import json
 
-from .areas import Area
+import geopandas as gpd
+from shapely import union_all
+from shapely.geometry import box
+
+from .areas import Area, BoundarySpec
 
 WGS84 = "EPSG:4326"
+
+
+def _wanted_values(spec: BoundarySpec) -> tuple[str, ...]:
+    raw = spec.value if isinstance(spec.value, tuple) else (spec.value,)
+    return tuple(str(value).strip() for value in raw if value is not None)
+
+
+def boundary_identity(area: Area, geometry=None) -> dict[str, object]:
+    """Return a content-addressed identity for the effective clipping boundary."""
+    if area.boundary is None:
+        report: dict[str, object] = {
+            "mode": "bbox",
+            "bbox": [float(value) for value in area.bbox],
+        }
+        fingerprint_payload = report
+    else:
+        spec = area.boundary
+        if not spec.gpkg.exists():
+            raise FileNotFoundError(f"boundary GeoPackage does not exist: {spec.gpkg}")
+        effective = geometry if geometry is not None else load_boundary(area)
+        geometry_sha256 = hashlib.sha256(effective.wkb).hexdigest()
+        fingerprint_payload = {
+            "mode": "gpkg",
+            "geometry_sha256": geometry_sha256,
+            "layer": spec.layer,
+            "field": spec.field,
+            "values": list(_wanted_values(spec)),
+        }
+        report = {
+            **fingerprint_payload,
+            "gpkg": str(spec.gpkg),
+        }
+
+    encoded = json.dumps(
+        fingerprint_payload,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode()
+    return {
+        **report,
+        "fingerprint": hashlib.sha256(encoded).hexdigest(),
+    }
 
 
 def load_boundary(area: Area):
@@ -17,16 +62,32 @@ def load_boundary(area: Area):
     spec = area.boundary
     if not spec.gpkg.exists():
         raise FileNotFoundError(f"boundary GeoPackage does not exist: {spec.gpkg}")
-    frame = gpd.read_file(spec.gpkg, layer=spec.layer)
+
+    # The GeoPackage contains every Philippine locality. Restrict the read to
+    # the area's acquisition envelope before applying the exact PSGC filter.
+    columns = [spec.field] if spec.field else None
+    frame = gpd.read_file(
+        spec.gpkg,
+        layer=spec.layer,
+        bbox=area.bbox,
+        columns=columns,
+    )
     if frame.empty:
-        raise ValueError(f"boundary layer is empty: {spec.gpkg}")
+        raise ValueError(
+            f"boundary layer has no geometry intersecting {area.slug!r}: {spec.gpkg}"
+        )
+
     if spec.field:
         if spec.field not in frame.columns:
             raise ValueError(f"boundary field {spec.field!r} not found in {spec.gpkg}")
-        values = frame[spec.field].astype(str).str.strip().str.replace(r"\.0$", "", regex=True)
+        values = (
+            frame[spec.field]
+            .astype(str)
+            .str.strip()
+            .str.replace(r"\.0$", "", regex=True)
+        )
 
-        wanted_values = spec.value if isinstance(spec.value, tuple) else (spec.value,)
-        wanted_values = tuple(str(v).strip() for v in wanted_values if v is not None)
+        wanted_values = _wanted_values(spec)
         mask = values.isin(wanted_values)
         for wanted in wanted_values:
             if wanted.isdigit():
@@ -38,22 +99,27 @@ def load_boundary(area: Area):
             )
 
         matched = set(
-            frame[spec.field].astype(str).str.strip().str.replace(r"\.0$", "", regex=True)
+            frame[spec.field]
+            .astype(str)
+            .str.strip()
+            .str.replace(r"\.0$", "", regex=True)
         )
+        stripped_matched = {value.lstrip("0") for value in matched}
         missing = [
             wanted
             for wanted in wanted_values
             if wanted not in matched
-            and not (wanted.isdigit() and wanted.lstrip("0") in {v.lstrip("0") for v in matched})
+            and not (wanted.isdigit() and wanted.lstrip("0") in stripped_matched)
         ]
         if missing:
             raise ValueError(
                 f"boundary rows missing for {spec.field} values {missing!r} in {spec.gpkg}"
             )
+
     if frame.crs is None:
         raise ValueError(f"boundary layer has no CRS: {spec.gpkg}")
     frame = frame.to_crs(WGS84)
-    geometry = unary_union(frame.geometry.dropna().tolist())
+    geometry = union_all(frame.geometry.dropna().to_numpy())
     if geometry.is_empty:
         raise ValueError(f"boundary geometry is empty: {spec.gpkg}")
     return geometry

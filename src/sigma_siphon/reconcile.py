@@ -121,8 +121,13 @@ def _single(row: pd.Series) -> dict[str, object]:
     }
 
 
-def reconcile(osm: gpd.GeoDataFrame, overture: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
-    """Resolve likely cross-source duplicates while preserving unmatched observations."""
+def reconcile(
+    osm: gpd.GeoDataFrame,
+    overture: gpd.GeoDataFrame,
+    *,
+    boundary=None,
+) -> gpd.GeoDataFrame:
+    """Resolve duplicates while preserving unmatched and in-boundary coordinates."""
     osm = osm.reset_index(drop=True)
     overture = overture.reset_index(drop=True)
     candidates = _candidate_pairs(osm, overture)
@@ -141,6 +146,22 @@ def reconcile(osm: gpd.GeoDataFrame, overture: gpd.GeoDataFrame) -> gpd.GeoDataF
         aliases = sorted({str(left["name"]), str(right["name"])} - {name})
         lon = (float(left.lon) + float(right.lon)) / 2.0
         lat = (float(left.lat) + float(right.lat)) / 2.0
+        if boundary is not None and not boundary.covers(Point(lon, lat)):
+            # Two valid source points can have a midpoint outside a concave
+            # polygon or inside a hole. Keep the match but use an actual
+            # in-boundary source coordinate. Prefer the source supplying
+            # the canonical name, then the other source deterministically.
+            preferred = (left, right) if name == str(left["name"]) else (right, left)
+            for source_row in preferred:
+                source_lon = float(source_row.lon)
+                source_lat = float(source_row.lat)
+                if boundary.covers(Point(source_lon, source_lat)):
+                    lon, lat = source_lon, source_lat
+                    break
+            else:
+                raise RuntimeError(
+                    "reconciled pair has no source coordinate inside the configured boundary"
+                )
         rows.append(
             {
                 "poi_id": _poi_id([f"osm:{left.source_id}", f"overture:{right.source_id}"]),

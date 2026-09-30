@@ -13,6 +13,7 @@ from shapely.geometry import Point
 
 from ..licensing import OSM_LICENSE
 from ..text import clean_text, combine
+from .cache import cache_matches_bbox, write_cache_identity
 
 POI_KEYS = (
     "amenity",
@@ -72,7 +73,7 @@ def _commercial_endpoint() -> str:
 
 
 def _user_agent() -> str:
-    return os.getenv("SIGMA_OSM_USER_AGENT", "SigmaSiphon/0.1.2").strip() or "SigmaSiphon/0.1.2"
+    return os.getenv("SIGMA_OSM_USER_AGENT", "SigmaSiphon/0.1.3").strip() or "SigmaSiphon/0.1.3"
 
 
 def _download_tile(
@@ -126,7 +127,7 @@ def fetch_osm(
         "source", "source_id", "name", "category", "lon", "lat",
         "upstream_license", "overture_providers",
     }
-    if cache_file.exists() and not refresh:
+    if not refresh and cache_matches_bbox(cache_file, bbox):
         cached = gpd.read_parquet(cache_file)
         if required.issubset(cached.columns):
             return cached
@@ -186,4 +187,5 @@ def fetch_osm(
         crs="EPSG:4326",
     )
     gdf.to_parquet(cache_file, index=False)
+    write_cache_identity(cache_file, bbox)
     return gdf

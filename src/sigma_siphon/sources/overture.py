@@ -8,6 +8,7 @@ from shapely import from_wkb
 
 from ..licensing import overture_record_allowed, overture_terms
 from ..text import clean_text, combine
+from .cache import cache_matches_bbox, write_cache_identity
 
 
 def _primary_name(value: object) -> str:
@@ -64,7 +65,7 @@ def fetch_overture(
         "source", "source_id", "name", "category", "lon", "lat",
         "upstream_license", "overture_providers",
     }
-    if cache_file.exists() and not refresh:
+    if not refresh and cache_matches_bbox(cache_file, bbox):
         cached = gpd.read_parquet(cache_file)
         if required.issubset(cached.columns):
             return cached
@@ -118,4 +119,5 @@ def fetch_overture(
         frame = pd.DataFrame(columns=columns)
     gdf = gpd.GeoDataFrame(frame, geometry="geometry", crs="EPSG:4326")
     gdf.to_parquet(cache_file, index=False)
+    write_cache_identity(cache_file, bbox)
     return gdf
