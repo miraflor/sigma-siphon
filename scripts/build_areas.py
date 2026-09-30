@@ -12,8 +12,8 @@ import geopandas as gpd
 import pandas as pd
 import requests
 import yaml
+from shapely import union_all
 from shapely.geometry import shape
-from shapely.ops import unary_union
 
 PSGC_EXPECTED = 1642
 COMPOSITES = {
@@ -412,7 +412,7 @@ def build_sga_geometries(
     out: dict[str, dict] = {}
     for municipality_code, old_codes in sorted(sga_barangays.items()):
         pieces = [by_barangay[code][0] for code in old_codes]
-        geom = unary_union(pieces)
+        geom = union_all(pieces)
         if geom.is_empty:
             raise RuntimeError(f"Empty SGA union for {municipality_code}")
         out[municipality_code] = {
@@ -480,7 +480,7 @@ def build_matches(
                     selected.append(idx)
             if not selected:
                 raise RuntimeError("Could not assemble Manila from geoBoundaries districts")
-            geom = unary_union([gb.geometry.iloc[i] for i in selected])
+            geom = union_all([gb.geometry.iloc[i] for i in selected])
             source_ids = ";".join(str(gb.iloc[i]["shapeID"]) for i in selected)
             source_names = ";".join(str(gb.iloc[i]["shapeName"]) for i in selected)
             used.update(selected)
@@ -598,7 +598,7 @@ def make_yaml_payload(boundaries: gpd.GeoDataFrame) -> dict:
         missing = [code for code in members if code not in by_code.index]
         if missing:
             raise RuntimeError(f"Composite {slug} references unknown PSGC codes: {missing}")
-        geometry = unary_union([by_code.loc[code].geometry for code in members])
+        geometry = union_all([by_code.loc[code].geometry for code in members])
         west, south, east, north = geometry.bounds
         areas[slug] = {
             "name": composite["name"],
@@ -740,6 +740,12 @@ def main() -> None:
     check = gpd.read_file(gpkg, layer="areas")
     if len(check) != PSGC_EXPECTED:
         raise RuntimeError(f"GPKG readback count is {len(check)}, expected {PSGC_EXPECTED}")
+    if check["psgc_code"].nunique() != PSGC_EXPECTED:
+        raise RuntimeError("GPKG readback has duplicate PSGC codes")
+    if check.geometry.isna().any() or check.geometry.is_empty.any():
+        raise RuntimeError("GPKG readback contains empty boundary geometry")
+    if not bool(check.geometry.is_valid.all()):
+        raise RuntimeError("GPKG readback contains invalid boundary geometry")
     configured_expected = PSGC_EXPECTED + len(COMPOSITES)
     if len(payload["areas"]) != configured_expected:
         raise RuntimeError(

@@ -8,23 +8,15 @@ from pathlib import Path
 
 from . import __version__
 from .areas import Area, resolve_area
-from .boundary import clip_points, load_boundary
+from .boundary import boundary_identity, clip_points, load_boundary
 from .industry import tag_places
 from .llm import LLMClassifier
 from .reconcile import reconcile
 from .sources import fetch_osm, fetch_overture
 
 
-def _boundary_report(area: Area) -> dict[str, object]:
-    if area.boundary is None:
-        return {"mode": "bbox"}
-    return {
-        "mode": "gpkg",
-        "gpkg": str(area.boundary.gpkg),
-        "layer": area.boundary.layer,
-        "field": area.boundary.field,
-        "value": area.boundary.value,
-    }
+def _boundary_report(area: Area, geometry) -> dict[str, object]:
+    return boundary_identity(area, geometry)
 
 
 def _terms(series) -> list[str]:
@@ -105,11 +97,18 @@ def run_pipeline(
     overture = fetch_overture(area.bbox, cache_root / "overture.parquet", refresh=refresh)
 
     boundary = load_boundary(area)
+    boundary_report = _boundary_report(area, boundary)
     if clip:
         osm = clip_points(osm, boundary)
         overture = clip_points(overture, boundary)
 
-    canonical = reconcile(osm, overture)
+    canonical = reconcile(osm, overture, boundary=boundary if clip else None)
+    if clip and len(canonical):
+        inside = canonical.geometry.covered_by(boundary)
+        if not bool(inside.all()):
+            raise RuntimeError(
+                "canonical output contains coordinates outside the configured boundary"
+            )
 
     classifier = LLMClassifier.from_environment(cache_root / "llm.sqlite") if use_llm else None
     try:
@@ -141,7 +140,7 @@ def run_pipeline(
             "psgc_code": area.psgc_code,
             "bbox": list(area.bbox),
         },
-        "boundary": _boundary_report(area),
+        "boundary": boundary_report,
         "clip_enabled": bool(clip),
         "sources": ["osm", "overture"],
         "counts": {

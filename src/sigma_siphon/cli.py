@@ -58,6 +58,19 @@ def doctor(
     localities = sum(area.kind in {"city", "municipality"} for area in areas.values())
     composites = sum(area.kind == "composite" for area in areas.values())
     console.print(f"Areas: {len(areas)} ({localities} localities + {composites} composites)")
+    boundary_files = {
+        area.boundary.gpkg
+        for area in areas.values()
+        if area.boundary is not None
+    }
+    missing_boundaries = sorted(path for path in boundary_files if not path.exists())
+    console.print(
+        "Exact boundaries: "
+        + ("available" if boundary_files and not missing_boundaries else "MISSING")
+    )
+    if missing_boundaries:
+        for path in missing_boundaries:
+            console.print(f"  missing: {path}")
     console.print(f"OSM endpoint: {'configured' if osm_ready else 'not configured'}")
     console.print(f"LLM: {'configured' if llm_ready else 'not configured (rules-only fallback)'}")
 

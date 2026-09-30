@@ -31,7 +31,7 @@ For OSM acquisition, Sigma Siphon deliberately has **no volunteer public Overpas
 
 ```powershell
 $env:SIGMA_OSM_OVERPASS_URL="https://your-overpass.example/api/interpreter"
-$env:SIGMA_OSM_USER_AGENT="SigmaSiphon/0.1.2 (+https://your-company.example/contact)"
+$env:SIGMA_OSM_USER_AGENT="SigmaSiphon/0.1.3 (+https://your-company.example/contact)"
 ```
 
 The data licenses are separate from the software license. OSM data are ODbL 1.0. Because this pipeline reconciles OSM with another POI database into canonical records, an output containing OSM-derived records is conservatively distributed as an **ODbL 1.0 database**. Overture-origin content retains its applicable provider terms. Every run writes both `ATTRIBUTION.txt` and `DATABASE_LICENSE.txt`, and the final GeoParquet retains `source_licenses` and `overture_providers` columns.
@@ -101,7 +101,7 @@ sigma-siphon run quezon_city --no-llm
 
 ## Boundaries
 
-`data/boundaries/areas.gpkg` contains one polygon per city or municipality and is keyed by `psgc_code`. `config/areas.yml` contains 1,642 canonical locality entries plus the three composite areas. A locality's 10-digit PSGC is stored in `aliases` and resolves to the same area. Duplicate locality names receive province-qualified slugs where possible. Composite boundaries reuse the same GeoPackage rows and are unions of their fixed member PSGCs, so no duplicate metro geometry is stored.
+`data/boundaries/areas.gpkg` contains one polygon per city or municipality and is keyed by `psgc_code`. `config/areas.yml` contains 1,642 canonical locality entries plus the three composite areas. A locality's 10-digit PSGC is stored in `aliases` and resolves to the same area. Duplicate locality names receive province-qualified slugs where possible. Composite boundaries reuse the same GeoPackage rows and are unions of their fixed member PSGCs, so no duplicate metro geometry is stored. Runtime boundary reads are spatially prefiltered to the selected area's bbox before the exact PSGC rows are selected, avoiding a full 1,642-geometry read for ordinary locality runs. `run.json` records a SHA-256 fingerprint of the effective selected boundary geometry and PSGCs.
 
 Regenerate both files with `scripts/build_areas.py`. The build uses the current official PSGC workbook for names/codes and the simplified geoBoundaries Philippines ADM3 layer for output geometry. A PSGC-keyed historical boundary snapshot is used only as a spatial crosswalk to avoid ambiguous name matching.
 
@@ -152,11 +152,11 @@ The local labels are independently worded descriptors of the code structure rath
 
 OSM and Overture observations are linked only when both geography and normalized names satisfy a distance-sensitive threshold. Very short and generic names are treated more strictly. Candidate matches are processed strongest-first, one observation per source, and the final row retains match distance and name score.
 
-The final canonical coordinates for a two-source match are the midpoint of the two representative points. This is a reconciliation coordinate, not a surveyed location.
+The final canonical coordinates for a two-source match are normally the midpoint of the two representative points. If that midpoint would fall outside a concave configured boundary or into a hole, Sigma Siphon keeps the match but falls back deterministically to an actual in-boundary source coordinate. The result remains a reconciliation coordinate, not a surveyed location.
 
 ## Caching
 
-Source caches live under `.sigma-cache/<area>/`. Cached source files are reused only when they contain the current normalized licensing/provenance schema; an older cache is automatically reacquired.
+Source caches live under `.sigma-cache/<area>/`. Cached source files are reused only when they contain the current normalized licensing/provenance schema **and** a matching acquisition-bbox identity; an older cache or a cache built for a different bbox is automatically reacquired. This prevents a changed administrative extent from silently reusing an undersized source cache.
 Overture ingestion is license-fail-closed: records from an excluded or unrecognized provider are not admitted until that provider is explicitly audited.
 
 LLM decisions are cached by POI evidence **and** by model endpoint, model name, classification-policy version, and catalog fingerprint. Changing the catalog or classification policy therefore cannot silently reuse stale decisions.

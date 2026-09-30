@@ -60,3 +60,6 @@ def test_end_to_end_without_network(monkeypatch, tmp_path: Path):
     assert report["classification"]["io80_code_71_allowed"] is True
     assert report["licensing"]["database_license"] == "ODbL-1.0"
     assert report["licensing"]["software"] == "Proprietary"
+    assert report["boundary"]["mode"] == "gpkg"
+    assert len(str(report["boundary"]["geometry_sha256"])) == 64
+    assert len(str(report["boundary"]["fingerprint"])) == 64
