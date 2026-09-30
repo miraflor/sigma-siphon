@@ -23,15 +23,30 @@ def load_boundary(area: Area):
     if spec.field:
         if spec.field not in frame.columns:
             raise ValueError(f"boundary field {spec.field!r} not found in {spec.gpkg}")
-        wanted = str(spec.value).strip()
         values = frame[spec.field].astype(str).str.strip().str.replace(r"\.0$", "", regex=True)
-        exact = values == wanted
-        if wanted.isdigit():
-            exact |= values.str.replace(r"^0+", "", regex=True) == wanted.lstrip("0")
-        frame = frame.loc[exact]
+
+        wanted_values = spec.value if isinstance(spec.value, tuple) else (spec.value,)
+        wanted_values = tuple(str(v).strip() for v in wanted_values if v is not None)
+        mask = values.isin(wanted_values)
+        for wanted in wanted_values:
+            if wanted.isdigit():
+                mask |= values.str.replace(r"^0+", "", regex=True) == wanted.lstrip("0")
+        frame = frame.loc[mask]
         if frame.empty:
             raise ValueError(
-                f"no boundary row where {spec.field}={spec.value!r} in {spec.gpkg}"
+                f"no boundary row where {spec.field} matches {spec.value!r} in {spec.gpkg}"
+            )
+
+        matched = set(frame[spec.field].astype(str).str.strip().str.replace(r"\.0$", "", regex=True))
+        missing = [
+            wanted
+            for wanted in wanted_values
+            if wanted not in matched
+            and not (wanted.isdigit() and wanted.lstrip("0") in {v.lstrip("0") for v in matched})
+        ]
+        if missing:
+            raise ValueError(
+                f"boundary rows missing for {spec.field} values {missing!r} in {spec.gpkg}"
             )
     if frame.crs is None:
         raise ValueError(f"boundary layer has no CRS: {spec.gpkg}")

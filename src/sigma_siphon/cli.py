@@ -34,7 +34,7 @@ def areas_command(
     table.add_column("PSGC")
     table.add_column("Boundary")
     for area in areas.values():
-        haystack = f"{area.slug} {area.name}".casefold()
+        haystack = f"{area.slug} {area.name} {' '.join(area.aliases)}".casefold()
         if query and query not in haystack:
             continue
         table.add_row(
@@ -55,14 +55,16 @@ def doctor(
     llm_ready = bool(os.getenv("SIGMA_LLM_MODEL") and os.getenv("SIGMA_LLM_API_KEY"))
     osm_ready = bool(os.getenv("SIGMA_OSM_OVERPASS_URL"))
     console.print(f"sigma-siphon {__version__}")
-    console.print(f"Areas: {len(areas)}")
+    localities = sum(area.kind in {"city", "municipality"} for area in areas.values())
+    composites = sum(area.kind == "composite" for area in areas.values())
+    console.print(f"Areas: {len(areas)} ({localities} localities + {composites} composites)")
     console.print(f"OSM endpoint: {'configured' if osm_ready else 'not configured'}")
     console.print(f"LLM: {'configured' if llm_ready else 'not configured (rules-only fallback)'}")
 
 
 @app.command("run")
 def run_command(
-    area: Annotated[str, typer.Argument(help="Area slug from `sigma-siphon areas`")],
+    area: Annotated[str, typer.Argument(help="Area slug, exact name, or 10-digit PSGC")],
     areas_file: Annotated[Path | None, typer.Option(help="Alternate areas YAML")] = None,
     root: Annotated[Path, typer.Option(help="Working root")] = Path("."),
     output_dir: Annotated[Path | None, typer.Option(help="Output root; default <root>/output")] = None,

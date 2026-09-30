@@ -10,14 +10,9 @@ area -> acquire -> clip -> reconcile -> IO80 classify -> derive IO16 -> GeoParqu
 
 ## Scope
 
-The packaged area catalog intentionally contains only:
+The area catalog contains one canonical record for every Philippine city and municipality in the current PSGC, plus exactly three composite acquisition areas: Metro Manila, Metro Cebu, and Metro Davao. Each locality has one boundary geometry and one 10-digit PSGC code; the PSGC is accepted as an alias for the locality. Composite areas contain fixed member PSGC codes and dissolve those locality geometries at runtime; they are not additional PSGC localities.
 
-- the 33 Highly Urbanized Cities;
-- Metro Manila;
-- Metro Cebu; and
-- Metro Davao.
-
-Each area has a bounding box and an optional GeoPackage boundary definition. Until a polygon is configured, the bounding box is the clipping boundary.
+Administrative clipping geometry is stored in one lightweight GeoPackage generated from the simplified geoBoundaries Philippines ADM3 layer. `config/areas.yml` is generated from the same boundary build so the YAML and GeoPackage stay synchronized.
 
 ## Data sources
 
@@ -87,39 +82,44 @@ sigma-siphon areas
 Run the full pipeline:
 
 ```powershell
+sigma-siphon run quezon_city
+# or a documented composite area
 sigma-siphon run metro_manila
 ```
 
 Refresh acquisition caches:
 
 ```powershell
-sigma-siphon run metro_manila --refresh
+sigma-siphon run 1381300000 --refresh
 ```
 
 Disable LLM classification and retain only high-confidence deterministic tags:
 
 ```powershell
-sigma-siphon run metro_manila --no-llm
+sigma-siphon run quezon_city --no-llm
 ```
 
 ## Boundaries
 
-An area entry can attach a polygon layer from a GeoPackage:
+`data/boundaries/areas.gpkg` contains one polygon per city or municipality and is keyed by `psgc_code`. `config/areas.yml` contains 1,642 canonical locality entries plus the three composite areas. A locality's 10-digit PSGC is stored in `aliases` and resolves to the same area. Duplicate locality names receive province-qualified slugs where possible. Composite boundaries reuse the same GeoPackage rows and are unions of their fixed member PSGCs, so no duplicate metro geometry is stored.
+
+Regenerate both files with `scripts/build_areas.py`. The build uses the current official PSGC workbook for names/codes and the simplified geoBoundaries Philippines ADM3 layer for output geometry. A PSGC-keyed historical boundary snapshot is used only as a spatial crosswalk to avoid ambiguous name matching.
+
+Example generated entry:
 
 ```yaml
-ncr_quezon_city:
+quezon_city:
   name: Quezon City
-  kind: huc
+  kind: city
   psgc_code: "1381300000"
-  bbox: [120.93720, 14.54247, 121.16004, 14.75952]
+  aliases: ["1381300000"]
+  bbox: [120.9, 14.5, 121.2, 14.8]
   boundary:
-    gpkg: ../data/boundaries/hucs.gpkg
-    layer: hucs
-    field: PSGC_CODE
+    gpkg: ../data/boundaries/areas.gpkg
+    layer: areas
+    field: psgc_code
     value: "1381300000"
 ```
-
-Relative paths are resolved from the YAML file's directory. The packaged boundary slots can therefore be filled later without changing pipeline code.
 
 ## Output
 

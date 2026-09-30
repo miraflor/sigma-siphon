@@ -39,6 +39,7 @@ packages = ["src/sigma_siphon"]
 
 [tool.hatch.build.targets.wheel.force-include]
 "config/areas.yml" = "sigma_siphon/data/areas.yml"
+"data/boundaries/areas.gpkg" = "sigma_siphon/data/boundaries/areas.gpkg"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
