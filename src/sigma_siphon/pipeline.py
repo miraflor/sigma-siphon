@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import platform
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from . import __version__
@@ -51,10 +51,17 @@ def _attribution_text(tagged) -> str:
             "Observed Overture providers: " + (", ".join(sorted(providers)) or "none recorded"),
             "",
             "Database note",
-            "When OSM-derived records are present, this fused POI database is distributed under ODbL 1.0 as a conservative compliance posture for a reconciled database.",
+            (
+                "When OSM-derived records are present, this fused POI database is "
+                "distributed under ODbL 1.0 as a conservative compliance posture "
+                "for a reconciled database."
+            ),
             "",
             "Software",
-            "Sigma Siphon software is proprietary and all rights are reserved. Third-party software and source-data licensing are separate.",
+            (
+                "Sigma Siphon software is proprietary and all rights are reserved. "
+                "Third-party software and source-data licensing are separate."
+            ),
             "",
         ]
     )
@@ -125,7 +132,7 @@ def run_pipeline(
     report: dict[str, object] = {
         "package": "sigma-siphon",
         "version": __version__,
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
         "python": platform.python_version(),
         "area": {
             "slug": area.slug,
@@ -141,7 +148,9 @@ def run_pipeline(
             "osm": len(osm),
             "overture": len(overture),
             "canonical": len(canonical),
-            "matched_two_source": int((canonical["source_count"] == 2).sum()) if len(canonical) else 0,
+            "matched_two_source": (
+                int((canonical["source_count"] == 2).sum()) if len(canonical) else 0
+            ),
             "tagged": len(tagged) - unresolved,
             "unresolved": unresolved,
         },

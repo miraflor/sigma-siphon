@@ -179,7 +179,10 @@ def fetch_osm(
         frame = pd.DataFrame(columns=columns)
     gdf = gpd.GeoDataFrame(
         frame,
-        geometry=[Point(xy) for xy in zip(frame.get("lon", []), frame.get("lat", []), strict=False)],
+        geometry=[
+            Point(xy)
+            for xy in zip(frame.get("lon", []), frame.get("lat", []), strict=False)
+        ],
         crs="EPSG:4326",
     )
     gdf.to_parquet(cache_file, index=False)

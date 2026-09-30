@@ -37,7 +37,9 @@ def load_boundary(area: Area):
                 f"no boundary row where {spec.field} matches {spec.value!r} in {spec.gpkg}"
             )
 
-        matched = set(frame[spec.field].astype(str).str.strip().str.replace(r"\.0$", "", regex=True))
+        matched = set(
+            frame[spec.field].astype(str).str.strip().str.replace(r"\.0$", "", regex=True)
+        )
         missing = [
             wanted
             for wanted in wanted_values

@@ -47,7 +47,8 @@ def main() -> None:
     failures: list[str] = []
     if actual_project_license != AUDITED_PROJECT_LICENSE:
         failures.append(
-            f"project license changed: expected {AUDITED_PROJECT_LICENSE!r}, got {actual_project_license!r}"
+            f"project license changed: expected {AUDITED_PROJECT_LICENSE!r}, "
+            f"got {actual_project_license!r}"
         )
     if actual_backend != AUDITED_BACKEND:
         failures.append(

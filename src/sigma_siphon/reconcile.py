@@ -145,9 +145,16 @@ def reconcile(osm: gpd.GeoDataFrame, overture: gpd.GeoDataFrame) -> gpd.GeoDataF
             {
                 "poi_id": _poi_id([f"osm:{left.source_id}", f"overture:{right.source_id}"]),
                 "name": name,
-                "category": " | ".join(dict.fromkeys(
-                    x for x in (clean_text(left.get("category")), clean_text(right.get("category"))) if x
-                )),
+                "category": " | ".join(
+                    dict.fromkeys(
+                        x
+                        for x in (
+                            clean_text(left.get("category")),
+                            clean_text(right.get("category")),
+                        )
+                        if x
+                    )
+                ),
                 "lon": lon,
                 "lat": lat,
                 "source_count": 2,
@@ -182,6 +189,9 @@ def reconcile(osm: gpd.GeoDataFrame, overture: gpd.GeoDataFrame) -> gpd.GeoDataF
         ])
     return gpd.GeoDataFrame(
         frame,
-        geometry=[Point(xy) for xy in zip(frame.get("lon", []), frame.get("lat", []), strict=False)],
+        geometry=[
+            Point(xy)
+            for xy in zip(frame.get("lon", []), frame.get("lat", []), strict=False)
+        ],
         crs="EPSG:4326",
     )

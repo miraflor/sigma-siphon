@@ -20,7 +20,7 @@ class LLMDecision:
 
 
 def _signature(name: str, category: str) -> str:
-    return hashlib.sha256(f"{name}\n{category}".encode("utf-8")).hexdigest()
+    return hashlib.sha256(f"{name}\n{category}".encode()).hexdigest()
 
 
 class DecisionCache:
@@ -98,7 +98,7 @@ class LLMClassifier:
     def close(self) -> None:
         self.cache.close()
 
-    def _prompt(self, batch, catalog: dict[str, "Industry"]):
+    def _prompt(self, batch, catalog: dict[str, Industry]):
         industries = "\n".join(
             f"{x.io80_code}: {x.io80_label}" for x in catalog.values()
         )
@@ -136,7 +136,7 @@ class LLMClassifier:
             raise ValueError("LLM did not return a JSON object")
         return json.loads(raw[start : end + 1])
 
-    def _call(self, batch, catalog: dict[str, "Industry"]) -> dict[int, LLMDecision]:
+    def _call(self, batch, catalog: dict[str, Industry]) -> dict[int, LLMDecision]:
         system, user = self._prompt(batch, catalog)
         response = self.client.chat.completions.create(
             model=self.model,
@@ -164,7 +164,7 @@ class LLMClassifier:
         return decisions
 
     @staticmethod
-    def _policy_identity(catalog: dict[str, "Industry"]) -> str:
+    def _policy_identity(catalog: dict[str, Industry]) -> str:
         payload = "\n".join(
             f"{x.io80_code}|{x.io80_label}|{x.io16_code}|{x.io16_label}"
             for x in catalog.values()
@@ -172,7 +172,7 @@ class LLMClassifier:
         digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
         return f"io80-direct-v2|catalog={digest}"
 
-    def classify(self, pending, catalog: dict[str, "Industry"]) -> dict[int, LLMDecision]:
+    def classify(self, pending, catalog: dict[str, Industry]) -> dict[int, LLMDecision]:
         decisions: dict[int, LLMDecision] = {}
         identity = f"{self.base_url}|{self.model}|{self._policy_identity(catalog)}"
         todo = []

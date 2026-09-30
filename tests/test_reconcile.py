@@ -20,11 +20,27 @@ def layer(source, rows):
 def test_near_same_name_is_reconciled():
     a = layer(
         "osm",
-        [{"source_id": "node/1", "name": "Alpha Coffee", "category": "amenity=cafe", "lon": 121.0, "lat": 14.5}],
+        [
+            {
+                "source_id": "node/1",
+                "name": "Alpha Coffee",
+                "category": "amenity=cafe",
+                "lon": 121.0,
+                "lat": 14.5,
+            }
+        ],
     )
     b = layer(
         "overture",
-        [{"source_id": "ov-1", "name": "Alpha Coffee", "category": "coffee shop", "lon": 121.00005, "lat": 14.5}],
+        [
+            {
+                "source_id": "ov-1",
+                "name": "Alpha Coffee",
+                "category": "coffee shop",
+                "lon": 121.00005,
+                "lat": 14.5,
+            }
+        ],
     )
     out = reconcile(a, b)
     assert len(out) == 1
@@ -38,11 +54,27 @@ def test_near_same_name_is_reconciled():
 def test_distant_observations_stay_separate():
     a = layer(
         "osm",
-        [{"source_id": "node/1", "name": "Alpha Coffee", "category": "amenity=cafe", "lon": 121.0, "lat": 14.5}],
+        [
+            {
+                "source_id": "node/1",
+                "name": "Alpha Coffee",
+                "category": "amenity=cafe",
+                "lon": 121.0,
+                "lat": 14.5,
+            }
+        ],
     )
     b = layer(
         "overture",
-        [{"source_id": "ov-1", "name": "Alpha Coffee", "category": "coffee shop", "lon": 121.01, "lat": 14.5}],
+        [
+            {
+                "source_id": "ov-1",
+                "name": "Alpha Coffee",
+                "category": "coffee shop",
+                "lon": 121.01,
+                "lat": 14.5,
+            }
+        ],
     )
     out = reconcile(a, b)
     assert len(out) == 2

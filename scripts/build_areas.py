@@ -139,7 +139,10 @@ def load_psgc(path: Path) -> tuple[pd.DataFrame, dict[str, str], dict[str, list[
         if h is None:
             continue
         frame = raw.iloc[h + 1 :].copy()
-        frame.columns = [str(v).strip() if pd.notna(v) else f"unnamed_{i}" for i, v in enumerate(raw.iloc[h])]
+        frame.columns = [
+            str(v).strip() if pd.notna(v) else f"unnamed_{i}"
+            for i, v in enumerate(raw.iloc[h])
+        ]
         frame = frame.dropna(how="all")
         selected = (sheet_name, frame)
         break
@@ -165,9 +168,23 @@ def load_psgc(path: Path) -> tuple[pd.DataFrame, dict[str, str], dict[str, list[
     work["level_norm"] = work["level_raw"].map(text_norm)
 
     province_mask = work["level_norm"].isin({"prov", "province"})
-    province_names = dict(zip(work.loc[province_mask, "psgc_code"], work.loc[province_mask, "name"]))
+    province_names = dict(
+        zip(
+            work.loc[province_mask, "psgc_code"],
+            work.loc[province_mask, "name"],
+            strict=True,
+        )
+    )
 
-    city_levels = {"city", "huc", "icc", "cc", "highly urbanized city", "independent component city", "component city"}
+    city_levels = {
+        "city",
+        "huc",
+        "icc",
+        "cc",
+        "highly urbanized city",
+        "independent component city",
+        "component city",
+    }
     muni_levels = {"mun", "municipality"}
     lgu = work[work["level_norm"].isin(city_levels | muni_levels)].copy()
     lgu["kind"] = lgu["level_norm"].map(lambda x: "municipality" if x in muni_levels else "city")
@@ -313,7 +330,9 @@ def choose_by_name(gb: gpd.GeoDataFrame, current_name: str, used: set[int]):
 
 def legacy_parent_psgc9(barangay_code: str) -> str:
     if not re.fullmatch(r"\d{9}", barangay_code):
-        raise RuntimeError(f"Expected a 9-digit legacy PSGC correspondence code, got {barangay_code!r}")
+        raise RuntimeError(
+            f"Expected a 9-digit legacy PSGC correspondence code, got {barangay_code!r}"
+        )
     return barangay_code[:6] + "000"
 
 
@@ -526,7 +545,7 @@ def assign_slugs(rows: list[dict]) -> None:
     counts = Counter(bases)
     used: set[str] = set()
 
-    for row, base in zip(rows, bases):
+    for row, base in zip(rows, bases, strict=True):
         slug = base
 
         if counts[base] > 1:
@@ -601,11 +620,14 @@ def make_yaml_payload(boundaries: gpd.GeoDataFrame) -> dict:
 def write_yaml(path: Path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     header = (
-        "# Generated area catalog: 1,642 canonical Philippine cities/municipalities plus three composites.\n"
-        "# PSGC codes identify localities; composite boundaries dissolve fixed member PSGCs at runtime.\n"
+        "# Generated area catalog: 1,642 canonical Philippine cities/municipalities "
+        "plus three composites.\n"
+        "# PSGC codes identify localities; composite boundaries dissolve fixed member "
+        "PSGCs at runtime.\n"
         "# Regenerate with scripts/build_areas.py; do not hand-edit generated entries.\n\n"
     )
-    path.write_text(header + yaml.safe_dump(payload, sort_keys=False, allow_unicode=True, width=120), encoding="utf-8")
+    body = yaml.safe_dump(payload, sort_keys=False, allow_unicode=True, width=120)
+    path.write_text(header + body, encoding="utf-8")
 
 
 def write_attribution(path: Path) -> None:
@@ -629,8 +651,18 @@ def write_attribution(path: Path) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--psgc", type=Path, required=True, help="Official PSA PSGC Q2 2026 Publication Datafile XLSX")
-    parser.add_argument("--geoboundaries", type=Path, required=True, help="PHL ADM3 simplified GeoJSON from geoBoundaries")
+    parser.add_argument(
+        "--psgc",
+        type=Path,
+        required=True,
+        help="Official PSA PSGC Q2 2026 Publication Datafile XLSX",
+    )
+    parser.add_argument(
+        "--geoboundaries",
+        type=Path,
+        required=True,
+        help="PHL ADM3 simplified GeoJSON from geoBoundaries",
+    )
     parser.add_argument("--repo-root", type=Path, default=Path("."))
     args = parser.parse_args()
 
@@ -642,7 +674,10 @@ def main() -> None:
     if not gb_path.exists():
         raise SystemExit(f"Missing geoBoundaries GeoJSON: {gb_path}")
     if gb_path.stat().st_size < 1_000_000:
-        raise SystemExit(f"{gb_path} is too small; it may be a Git-LFS pointer instead of the actual GeoJSON")
+        raise SystemExit(
+            f"{gb_path} is too small; it may be a Git-LFS pointer instead of the "
+            "actual GeoJSON"
+        )
 
     print("1/5 Reading current PSA PSGC...")
     lgu, _, sga_barangays = load_psgc(psgc_path)

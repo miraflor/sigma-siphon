@@ -30,7 +30,11 @@ class Rule:
 
 
 def load_catalog() -> dict[str, Industry]:
-    text = resources.files("sigma_siphon").joinpath("data", "industries.csv").read_text(encoding="utf-8")
+    text = (
+        resources.files("sigma_siphon")
+        .joinpath("data", "industries.csv")
+        .read_text(encoding="utf-8")
+    )
     out: dict[str, Industry] = {}
     for row in csv.DictReader(io.StringIO(text)):
         industry = Industry(

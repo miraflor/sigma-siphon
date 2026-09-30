@@ -67,8 +67,12 @@ def run_command(
     area: Annotated[str, typer.Argument(help="Area slug, exact name, or 10-digit PSGC")],
     areas_file: Annotated[Path | None, typer.Option(help="Alternate areas YAML")] = None,
     root: Annotated[Path, typer.Option(help="Working root")] = Path("."),
-    output_dir: Annotated[Path | None, typer.Option(help="Output root; default <root>/output")] = None,
-    cache_dir: Annotated[Path | None, typer.Option(help="Cache root; default <root>/.sigma-cache")] = None,
+    output_dir: Annotated[
+        Path | None, typer.Option(help="Output root; default <root>/output")
+    ] = None,
+    cache_dir: Annotated[
+        Path | None, typer.Option(help="Cache root; default <root>/.sigma-cache")
+    ] = None,
     refresh: Annotated[bool, typer.Option(help="Redownload source data for this area")] = False,
     clip: Annotated[
         bool,
