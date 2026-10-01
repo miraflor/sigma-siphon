@@ -5,26 +5,214 @@ Overture Maps, clips them to an exact configured city or municipality boundary,
 reconciles likely duplicates, classifies them to the 2018 Philippine
 input-output industries, and writes the result as GeoParquet.
 
-The normal user experience is intentionally simple:
+The default command is deliberately simple:
 
 ```powershell
 sigma-siphon run pasig
 ```
 
-**That default command does not use an LLM and does not require an OpenAI API
-key.**
+By default, Sigma Siphon uses deterministic classification rules only. It does
+**not** require an OpenAI account, API key, or API billing.
 
-It uses the built-in deterministic IO80 classification rules and derives IO16
-from IO80.
-
-If you later want the optional LLM-enhanced classifier, use:
+OpenAI is an optional enhancement that can be configured later:
 
 ```powershell
 sigma-siphon run pasig --llm
 ```
 
-The `--llm` option uses OpenAI only for POIs that were not resolved by the
-deterministic rules.
+---
+
+# Fastest installation
+
+If Git and Python 3.11 or newer already work on your computer, this is the
+entire installation:
+
+```powershell
+git clone https://github.com/YOUR-ORGANIZATION/sigma-siphon.git
+cd sigma-siphon
+python -m pip install -e .
+sigma-siphon doctor
+```
+
+Then run:
+
+```powershell
+sigma-siphon run pasig
+```
+
+That is the normal workflow.
+
+## Important: Sigma Siphon uses your current Python environment
+
+Sigma Siphon does **not** create a Conda environment for you.
+
+It does **not** install or reinstall Conda.
+
+It does **not** create a special launcher.
+
+This command:
+
+```powershell
+python -m pip install -e .
+```
+
+installs Sigma Siphon into whichever Python environment is active when you run
+it.
+
+For example, if you already use a Conda or virtual environment, activate the
+environment you want to use and then run the install command there.
+
+If your organization provides a standard Python environment, use that.
+
+---
+
+# Absolute-beginner Windows walkthrough
+
+Use this section if the short instructions above are unfamiliar.
+
+## Step 1 — Make sure Git is installed
+
+Open PowerShell and run:
+
+```powershell
+git --version
+```
+
+If you see a Git version number, continue to Step 2.
+
+If Windows says that `git` is not recognized, install Git for Windows from:
+
+```text
+https://git-scm.com/install/windows
+```
+
+Accepting the normal installer defaults is usually fine.
+
+After installation, close PowerShell, open it again, and run:
+
+```powershell
+git --version
+```
+
+## Step 2 — Make sure Python is available
+
+Run:
+
+```powershell
+python --version
+```
+
+Sigma Siphon requires Python 3.11 or newer.
+
+Examples that are new enough:
+
+```text
+Python 3.11.x
+Python 3.12.x
+Python 3.13.x
+```
+
+If your organization already provides Python, Conda, Miniforge, or another
+approved Python environment, use that.
+
+If you use Conda or a Python virtual environment, activate the environment you
+want Sigma Siphon installed into **before** continuing.
+
+Sigma Siphon will install into that environment. It will not create another one.
+
+If Python is not installed and your organization has no standard Python setup,
+ask your IT administrator which Python distribution you should use. Miniforge is
+one suitable option, but Sigma Siphon itself does not require Miniforge
+specifically.
+
+## Step 3 — Clone the repository
+
+Open your organization's internal GitHub page for `sigma-siphon`.
+
+Click:
+
+**Code → HTTPS → Copy**
+
+In PowerShell, choose where you want to store the repository. For example:
+
+```powershell
+mkdir "$HOME\Documents\GitHub" -ErrorAction SilentlyContinue
+cd "$HOME\Documents\GitHub"
+```
+
+Run `git clone` followed by the repository address you copied. Example:
+
+```powershell
+git clone https://github.com/YOUR-ORGANIZATION/sigma-siphon.git
+```
+
+GitHub may ask you to sign in using your organization's normal GitHub
+authentication.
+
+Enter the repository:
+
+```powershell
+cd sigma-siphon
+```
+
+## Step 4 — Install Sigma Siphon
+
+Run:
+
+```powershell
+python -m pip install -e .
+```
+
+This installs Sigma Siphon and its Python dependencies into the Python
+environment that is currently active.
+
+It does not create a second environment.
+
+It does not reinstall Python.
+
+It does not reinstall Conda.
+
+The `-e` means "editable install": the installed command points to this checkout
+of the repository. If the repository code is updated later with `git pull`, the
+installed command uses the updated code.
+
+## Step 5 — Verify the installation
+
+Run:
+
+```powershell
+sigma-siphon doctor
+```
+
+A normal installation without OpenAI should look approximately like:
+
+```text
+sigma-siphon 0.1.5
+Areas: 1645 (1642 localities + 3 composites)
+Exact boundaries: available
+OSM endpoint: ready
+LLM: optional — API key not configured (default rules-only mode is ready)
+```
+
+The LLM line saying that the API key is not configured is **not an error**.
+
+OpenAI is optional.
+
+## Step 6 — Test Pasig
+
+For the first Pasig run:
+
+```powershell
+sigma-siphon run pasig --refresh
+```
+
+The `--refresh` option forces a fresh download of the source data.
+
+After that, normal reruns can simply be:
+
+```powershell
+sigma-siphon run pasig
+```
 
 A successful run creates:
 
@@ -39,15 +227,45 @@ output\
 
 ---
 
-# The two operating modes
+# Optional convenience installer
 
-## Default mode: free, deterministic, no API key
+The shortest installation command is still:
+
+```powershell
+python -m pip install -e .
+```
+
+If you prefer a script, this repository also contains:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\setup.ps1
+```
+
+The script only:
+
+1. checks the currently active Python;
+2. verifies that it is Python 3.11 or newer;
+3. removes the obsolete Sigma Siphon launcher used by an older setup method, if
+   that launcher exists;
+4. runs `python -m pip install -e .`;
+5. runs diagnostics.
+
+It does **not** create, delete, activate, update, or reinstall any Conda
+environment.
+
+It does **not** configure OpenAI.
+
+---
+
+# Default mode: no LLM
+
+Normal use is:
 
 ```powershell
 sigma-siphon run pasig
 ```
 
-Pipeline:
+The pipeline is:
 
 ```text
 OSM + Overture
@@ -63,20 +281,27 @@ deterministic IO16 derivation
 output
 ```
 
-This is the normal default.
+No OpenAI API key is required.
 
-No OpenAI account, OpenAI API key, or OpenAI billing is needed.
-
-POIs that cannot be classified confidently by the deterministic rules remain
+POIs that cannot be confidently classified by the deterministic rules remain
 unresolved.
 
-## Optional mode: rules + OpenAI LLM
+---
+
+# Optional OpenAI LLM
+
+You can install and use Sigma Siphon indefinitely without configuring OpenAI.
+
+Only configure OpenAI if you decide that you want LLM classification for POIs
+that remain unresolved after the deterministic rules.
+
+The LLM is explicitly enabled with:
 
 ```powershell
 sigma-siphon run pasig --llm
 ```
 
-Pipeline:
+## What happens in LLM mode
 
 ```text
 OSM + Overture
@@ -96,255 +321,43 @@ deterministic IO16 derivation
 output
 ```
 
-This mode requires an OpenAI API key and usable API credits/billing.
+The deterministic rules always run first.
 
-You do not need to decide about the LLM during installation. You can install and
-test Sigma Siphon first in the free default mode and add OpenAI later.
+Only unresolved POIs are passed to the LLM.
 
----
+## Set up OpenAI later
 
-# First-time installation on Windows
+When you decide to try OpenAI, you do **not** reinstall Sigma Siphon.
 
-These instructions assume Windows 10 or Windows 11 and assume that the reader
-has never used Git, Conda, Python, or an API key before.
-
-You normally do this installation only once on a computer.
-
-## 1. Get access to the repository
-
-Open your organization's internal GitHub page for `sigma-siphon`.
-
-If GitHub says that the repository does not exist or you do not have permission,
-ask the repository owner or your organization's GitHub administrator for access.
-
-## 2. Install Git for Windows
-
-Git downloads the repository and lets you receive future updates.
-
-Open:
-
-```text
-https://git-scm.com/install/windows
-```
-
-Download and run the Windows installer.
-
-If you are unsure about an installer option, accepting the normal default is
-usually fine.
-
-After installation, open PowerShell and run:
+From the repository, run:
 
 ```powershell
-git --version
+powershell -ExecutionPolicy Bypass -File .\setup-llm.ps1
 ```
 
-You should see a Git version number.
+The helper:
 
-If Windows says that `git` is not recognized, close PowerShell and open it again.
-If needed, restart Windows.
+1. verifies that Sigma Siphon is already installed;
+2. securely asks for your OpenAI API key;
+3. stores the key in your Windows **User** environment;
+4. does not write the key into the repository;
+5. runs `sigma-siphon doctor`.
 
-## 3. Install Miniforge
+After the helper finishes, close PowerShell and open a new PowerShell window.
 
-Miniforge provides the isolated Python environment used by Sigma Siphon.
-
-You do not need to install Python separately.
-
-Open:
-
-```text
-https://github.com/conda-forge/miniforge/releases/latest
-```
-
-Download:
-
-```text
-Miniforge3-Windows-x86_64.exe
-```
-
-Run the installer.
-
-Recommended choices for an ordinary user:
-
-- choose **Just Me**;
-- keep the default installation folder;
-- keep the Start Menu shortcut;
-- otherwise accept the normal defaults.
-
-Open **Miniforge Prompt** from the Windows Start menu.
-
-Run:
-
-```powershell
-conda --version
-```
-
-You should see a Conda version number.
-
-### Important: setup does not reinstall Conda
-
-Sigma Siphon's setup script creates a dedicated environment named
-`sigma-siphon`.
-
-It does **not** reinstall Miniforge or Conda.
-
-Conceptually:
-
-```text
-Miniforge / Conda
-        │
-        └── sigma-siphon environment
-```
-
-The separate environment contains the Python packages Sigma Siphon needs and
-helps prevent dependency conflicts with unrelated software.
-
-## 4. Clone the repository
-
-In the browser, open the `sigma-siphon` repository.
-
-Click:
-
-**Code → HTTPS → Copy**
-
-In **Miniforge Prompt**, create a folder for repositories:
-
-```powershell
-mkdir "$HOME\Documents\GitHub" -ErrorAction SilentlyContinue
-cd "$HOME\Documents\GitHub"
-```
-
-Clone the repository. Replace the example URL with the URL you copied:
-
-```powershell
-git clone https://github.com/YOUR-ORGANIZATION/sigma-siphon.git
-```
-
-GitHub may ask you to sign in. Complete your organization's normal GitHub
-authentication.
-
-Enter the repository:
-
-```powershell
-cd sigma-siphon
-```
-
-## 5. Run the one-time setup script
-
-From inside the repository:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\setup.ps1
-```
-
-The script:
-
-1. checks that Conda exists;
-2. creates or updates the isolated `sigma-siphon` environment;
-3. installs Sigma Siphon and its dependencies;
-4. optionally offers to store an OpenAI API key;
-5. creates a permanent `sigma-siphon` command for your Windows user account;
-6. adds that command to your user `PATH`;
-7. runs `sigma-siphon doctor`.
-
-**You may skip OpenAI setup.** Sigma Siphon works normally without it.
-
-When setup finishes, close the terminal completely and open a **new PowerShell
-window**.
-
-## 6. Verify the installation
-
-Run:
+Then verify:
 
 ```powershell
 sigma-siphon doctor
 ```
 
-A normal installation without OpenAI should look roughly like:
-
-```text
-sigma-siphon 0.1.4
-Areas: 1645 (1642 localities + 3 composites)
-Exact boundaries: available
-OSM endpoint: ready
-LLM: optional — API key not configured (default rules-only mode is ready)
-```
-
-This is a healthy configuration.
-
-If you previously configured OpenAI, the last line should instead say that the
-LLM is configured.
-
-## 7. Run Pasig
-
-The normal first test is:
-
-```powershell
-sigma-siphon run pasig --refresh
-```
-
-After the first successful acquisition, ordinary reruns can simply be:
-
-```powershell
-sigma-siphon run pasig
-```
-
-You do not need to activate Conda manually.
-
-You do not need to `cd` into the repository.
-
-You do not need an OpenAI key.
-
-You do not need to specify an OSM endpoint.
-
-The setup script's launcher automatically uses the correct environment and the
-repository root.
-
----
-
-# Optional OpenAI setup
-
-OpenAI is an optional enhancement, not a requirement for Sigma Siphon.
-
-## What the LLM does
-
-The deterministic rules run first.
-
-Only POIs that remain unresolved are sent to the LLM when you explicitly add:
-
-```powershell
---llm
-```
-
-Example:
+And run:
 
 ```powershell
 sigma-siphon run pasig --llm
 ```
 
-## API key versus API usage
-
-Two different things are involved:
-
-1. **API key** — the secret credential used by Sigma Siphon.
-2. **API usage** — may consume granted/free credits or paid credits.
-
-Creating an API key itself does not incur a charge.
-
-An account may or may not have free or granted API credits. Do not assume every
-new OpenAI API account receives free usage.
-
-If the account has usable free/granted credits, those can be used for an initial
-LLM test.
-
-Otherwise, the organization can decide later whether to enable paid API usage.
-
-## ChatGPT and the API are separate
-
-A ChatGPT subscription does not automatically provide OpenAI API credits.
-
-Sigma Siphon's `--llm` mode uses the OpenAI API Platform.
-
-## Create an API key
+## Getting an OpenAI API key
 
 Open:
 
@@ -352,66 +365,41 @@ Open:
 https://platform.openai.com/api-keys
 ```
 
-Sign in to the correct organization/project.
+Sign in to the OpenAI API organization/project your organization expects you to
+use.
 
-Create a new secret key.
+Create a new secret key and copy it when it is displayed.
 
-Give it a recognizable name such as:
+The full secret is normally shown only when it is created. If you lose it,
+create a replacement key rather than trying to recover the original secret.
 
-```text
-Sigma Siphon - Your Name
-```
-
-Copy the secret when it is shown.
-
-The full secret normally cannot be viewed again later. If it is lost, create a
-new key and revoke the old one if appropriate.
-
-## Keep the key secret
+Treat the key like a password.
 
 Never:
 
 - commit it to GitHub;
 - put it in source code;
+- put a real key in `.env.example`;
 - put it in `README.md`;
-- put a real value in `.env.example`;
-- paste it into an issue;
-- send it in ordinary chat or email;
-- print it on screen while troubleshooting.
+- post it in an issue;
+- share it with another employee;
+- print it on screen for troubleshooting.
 
-## Add the key to Sigma Siphon
+## Free credits and paid API usage
 
-Return to the repository and rerun:
+Creating an API key is not the same thing as paying for API usage.
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\setup.ps1
-```
+If your OpenAI API organization/account has free or granted API credits, those
+can be used first.
 
-When asked whether to configure OpenAI, answer yes and paste the key.
+Do not assume that every new API account receives free credits.
 
-The typing is hidden.
+If no usable free/granted credits are available, the organization can decide
+later whether to enable paid API billing.
 
-The key is stored in the current Windows user's environment, outside the
-repository.
+A ChatGPT subscription and OpenAI API billing are separate.
 
-Close the terminal and open a new PowerShell window.
-
-Verify:
-
-```powershell
-sigma-siphon doctor
-```
-
-Then run the optional hybrid classifier:
-
-```powershell
-sigma-siphon run pasig --llm
-```
-
-If the key is missing and `--llm` is explicitly requested, Sigma Siphon stops
-before acquisition and tells you how to configure it.
-
-The normal command without `--llm` remains fully usable:
+You do not need any of this for the default:
 
 ```powershell
 sigma-siphon run pasig
@@ -419,52 +407,34 @@ sigma-siphon run pasig
 
 ---
 
-# Understanding the output
+# How to know whether the LLM was used
 
-A successful run writes:
+A normal default run:
+
+```powershell
+sigma-siphon run pasig
+```
+
+records:
 
 ```text
-output\<area>\pois.parquet
+llm_enabled = false
+tagged_by_llm = 0
+```
+
+An explicit LLM run:
+
+```powershell
+sigma-siphon run pasig --llm
+```
+
+records LLM usage in:
+
+```text
 output\<area>\run.json
-output\<area>\ATTRIBUTION.txt
-output\<area>\DATABASE_LICENSE.txt
 ```
 
-## `pois.parquet`
-
-This is the primary spatial dataset.
-
-It includes canonical POI fields, geometry, reconciliation/provenance fields,
-source-license information, and:
-
-```text
-io80_code
-io80_label
-io16_code
-io16_label
-tag_method
-tag_confidence
-tag_reason
-```
-
-`tag_method` indicates how a classification was obtained:
-
-```text
-rule         deterministic rule
-llm          OpenAI LLM, only when --llm was requested
-unresolved   no accepted classification
-```
-
-IO80 is the primary classification.
-
-IO16 is derived deterministically from IO80.
-
-## `run.json`
-
-This records run metadata, source counts, output counts, boundary identity,
-licensing information, and classification information.
-
-Its classification section includes:
+The classification section includes:
 
 ```text
 llm_enabled
@@ -475,27 +445,25 @@ tagged_by_llm
 unresolved
 ```
 
-In a default run:
-
-```text
-llm_enabled = false
-tagged_by_llm = 0
-```
-
-In an explicit LLM run:
-
-```powershell
-sigma-siphon run pasig --llm
-```
-
-`llm_enabled` is true and `tagged_by_llm` shows how many POIs were classified by
-the LLM.
+The terminal summary also reports rule-versus-LLM tagging counts.
 
 ---
 
 # Common commands
 
-Normal/default Pasig run:
+Check the installation:
+
+```powershell
+sigma-siphon doctor
+```
+
+Find Pasig:
+
+```powershell
+sigma-siphon areas --search pasig
+```
+
+Normal Pasig run:
 
 ```powershell
 sigma-siphon run pasig
@@ -507,28 +475,16 @@ Force fresh acquisition:
 sigma-siphon run pasig --refresh
 ```
 
-Optional LLM-enhanced run:
+Optional LLM-enhanced Pasig run:
 
 ```powershell
 sigma-siphon run pasig --llm
 ```
 
-Optional LLM-enhanced run with fresh acquisition:
+Fresh acquisition plus LLM:
 
 ```powershell
-sigma-siphon run pasig --llm --refresh
-```
-
-Find an area:
-
-```powershell
-sigma-siphon areas --search pasig
-```
-
-List all areas:
-
-```powershell
-sigma-siphon areas
+sigma-siphon run pasig --refresh --llm
 ```
 
 Other examples:
@@ -545,108 +501,114 @@ sigma-siphon run 1381200000
 
 # Updating Sigma Siphon
 
-Open PowerShell and go to the repository:
+Go to the repository:
 
 ```powershell
 cd "$HOME\Documents\GitHub\sigma-siphon"
 ```
 
-Pull the latest code:
+Get the latest version:
 
 ```powershell
 git pull --ff-only
 ```
 
-If setup or dependencies changed, rerun:
+Because the package is installed in editable mode, ordinary source-code updates
+take effect immediately.
+
+If `pyproject.toml` changed, rerun:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\setup.ps1
+python -m pip install -e .
 ```
 
-The script updates the existing `sigma-siphon` environment. It does not reinstall
-Miniforge.
+That updates Sigma Siphon in the **same currently active Python environment**.
 
 ---
 
 # Troubleshooting
 
-## `sigma-siphon` is not recognized
+## `python` is not recognized
 
-Close PowerShell and open a new PowerShell window.
+Python is not available in the current terminal.
 
-Try:
+If your organization uses Conda or another managed environment, activate that
+environment first.
 
-```powershell
-sigma-siphon doctor
-```
+Otherwise ask your IT administrator which Python installation you should use.
 
-If it still fails, return to the repository and rerun:
+## Python is older than 3.11
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\setup.ps1
-```
-
-## `conda` is not recognized during setup
-
-Use **Miniforge Prompt** for the first setup.
-
-Check:
+Run:
 
 ```powershell
-conda --version
+python --version
 ```
 
-## The default Pasig run asks for an OpenAI key
+Use a Python 3.11-or-newer environment.
 
-It should not.
+Sigma Siphon will not create one automatically.
 
-The default is rules-only:
+## `sigma-siphon` is not recognized after installation
+
+First confirm which Python you used:
+
+```powershell
+python -c "import sys; print(sys.executable)"
+```
+
+Then reinstall into that same active environment:
+
+```powershell
+python -m pip install -e .
+```
+
+If you use Conda or a virtual environment, make sure that environment is
+currently active.
+
+You can also verify the package itself with:
+
+```powershell
+python -m sigma_siphon doctor
+```
+
+## `--llm` says the API key is missing
+
+The default pipeline still works:
 
 ```powershell
 sigma-siphon run pasig
 ```
 
-OpenAI should be required only when you explicitly run:
+If you want LLM mode, run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\setup-llm.ps1
+```
+
+Then close PowerShell, open a new PowerShell window, and try:
 
 ```powershell
 sigma-siphon run pasig --llm
 ```
 
-Check the installed version:
+## The OpenAI request reports billing, quota, authentication, or permission errors
 
-```powershell
-sigma-siphon doctor
-```
+This affects only explicit `--llm` runs.
 
-## `--llm` says the API key is missing
-
-Either continue without the LLM:
+The normal rules-only pipeline remains available:
 
 ```powershell
 sigma-siphon run pasig
 ```
 
-or rerun setup and add an OpenAI key:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\setup.ps1
-```
-
-## The LLM reports authentication, permissions, billing, or quota errors
-
-The deterministic/default mode remains usable:
-
-```powershell
-sigma-siphon run pasig
-```
-
-For LLM use, ask the OpenAI API project owner to verify the API key, project
-access, model access, and available credits/billing.
+For LLM use, check the OpenAI API project, key, available credits/billing, and
+model permissions.
 
 ## An OSM request fails
 
-Sigma Siphon includes a default Overpass endpoint, but internet or provider
-outages can still occur.
+Sigma Siphon includes a default Overpass endpoint. Internet or provider outages
+can still occur.
 
 Retry:
 
@@ -654,74 +616,74 @@ Retry:
 sigma-siphon run pasig
 ```
 
-Successfully downloaded compatible source data are cached.
+Compatible downloaded source data are cached locally.
 
-## I moved the repository
+---
 
-The permanent launcher points to the repository location that existed when
-`setup.ps1` last ran.
+# Output
 
-Enter the repository at its new location and rerun:
+A successful run writes:
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\setup.ps1
+```text
+output\<area>\pois.parquet
+output\<area>\run.json
+output\<area>\ATTRIBUTION.txt
+output\<area>\DATABASE_LICENSE.txt
 ```
+
+`pois.parquet` includes canonical location and reconciliation fields,
+source/provenance information, geometry, and:
+
+```text
+io80_code
+io80_label
+io16_code
+io16_label
+tag_method
+tag_confidence
+tag_reason
+```
+
+`tag_method` can be:
+
+```text
+rule
+llm
+unresolved
+```
+
+IO80 is the primary classification. IO16 is derived deterministically from IO80.
 
 ---
 
 # Data sources
 
-Sigma Siphon uses two acquisition sources:
+Sigma Siphon uses:
 
 1. OpenStreetMap through Overpass.
-2. Overture Maps Places through the official `overturemaps` package.
+2. Overture Maps Places through the official `overturemaps` Python package.
 
-The application contains a normal Overpass endpoint default. A deployment
-maintainer can override it with:
+A default Overpass endpoint is built into the application. Deployment
+maintainers can override it with:
 
 ```text
 SIGMA_OSM_OVERPASS_URL
 ```
 
-Ordinary users should not need to set that variable.
-
----
-
-# LLM configuration defaults
-
-OpenAI support is optional.
-
-The application contains defaults for:
-
-```text
-SIGMA_LLM_MODEL
-SIGMA_LLM_BASE_URL
-```
-
-Ordinary users normally do not need to set either one.
-
-The only secret used by optional LLM mode is:
-
-```text
-SIGMA_LLM_API_KEY
-```
-
-LLM decisions are cached locally by POI evidence, model endpoint, model,
-classification-policy identity, and catalog fingerprint.
+Ordinary users do not need to configure it.
 
 ---
 
 # Boundaries
 
-`data/boundaries/areas.gpkg` contains the configured city/municipality boundary
-geometries keyed by PSGC.
+The configured Philippine city and municipality boundaries are packaged with
+Sigma Siphon.
 
-`config/areas.yml` contains the locality catalog and the configured composite
-areas.
+`config/areas.yml` contains the locality catalog and configured composite areas.
 
 A locality's 10-digit PSGC is accepted as an alias.
 
-`run.json` records a fingerprint of the effective boundary used for the run.
+`run.json` records a fingerprint of the effective boundary used in the run.
 
 ---
 
@@ -732,10 +694,10 @@ names satisfy the reconciliation thresholds.
 
 Candidate matches are processed strongest-first with one observation per source.
 
-A two-source canonical coordinate is normally the midpoint of the representative
-points. If that midpoint would fall outside the configured boundary or inside a
-hole, Sigma Siphon falls back deterministically to an actual in-boundary source
-coordinate.
+A two-source canonical coordinate is normally the midpoint of the
+representative points. If that midpoint would fall outside the configured
+boundary or inside a hole, Sigma Siphon falls back deterministically to an
+actual in-boundary source coordinate.
 
 ---
 
@@ -767,7 +729,7 @@ THIRD_PARTY_NOTICES.md
 
 ---
 
-# Maintainer/developer checks
+# Maintainer checks
 
 Ordinary users do not need these commands.
 
@@ -781,4 +743,4 @@ python -m compileall -q src tests scripts tools
 git diff --check
 ```
 
-Unit tests are network-free.
+The unit tests are network-free.

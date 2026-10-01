@@ -12,7 +12,7 @@ from . import __version__
 from .areas import load_areas
 from .llm import LLMClassifier
 from .pipeline import run_pipeline
-from .settings import DEFAULT_LLM_MODEL, DEFAULT_OSM_OVERPASS_URL
+from .settings import DEFAULT_OSM_OVERPASS_URL
 
 app = typer.Typer(
     add_completion=False,
@@ -54,7 +54,7 @@ def doctor(
     areas_file: Annotated[Path | None, typer.Option(help="Alternate areas YAML")] = None,
 ) -> None:
     areas = load_areas(areas_file)
-    llm_ready = LLMClassifier.is_configured()
+    key_present = LLMClassifier.is_configured()
     osm_override = bool(os.getenv("SIGMA_OSM_OVERPASS_URL", "").strip())
 
     console.print(f"sigma-siphon {__version__}")
@@ -83,12 +83,14 @@ def doctor(
     )
     console.print(f"OSM endpoint: ready — {endpoint_label}")
 
-    if llm_ready:
-        model = os.getenv("SIGMA_LLM_MODEL", DEFAULT_LLM_MODEL).strip() or DEFAULT_LLM_MODEL
-        console.print(f"LLM: configured — {model}")
+    if key_present:
+        console.print(
+            "LLM: API key variable present (not validated) — "
+            "LLM is used only when --llm is explicitly requested"
+        )
     else:
         console.print(
-            "LLM: optional — API key not configured "
+            "LLM: optional — no API key variable present "
             "(default rules-only mode is ready)"
         )
 

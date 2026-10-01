@@ -1,38 +1,33 @@
-# Sigma Siphon 0.1.4 overlay
+# Sigma Siphon 0.1.5 current-environment overlay
 
-Copy the contents of this overlay directly over the root of an untouched
-`sigma-siphon` 0.1.3 checkout.
+This overlay is designed for the current 0.1.4 `main` state.
 
-Files replaced:
+Copy the contents directly over the repository root.
 
-- `DATA_SOURCES.md`
+## Replaced
+
 - `README.md`
+- `setup.ps1`
 - `.env.example`
 - `pyproject.toml`
 - `src/sigma_siphon/__init__.py`
-- `src/sigma_siphon/cli.py`
-- `src/sigma_siphon/llm.py`
-- `src/sigma_siphon/pipeline.py`
-- `src/sigma_siphon/sources/osm.py`
-- `tests/test_osm.py`
-
-Files added:
-
-- `setup.ps1`
 - `src/sigma_siphon/settings.py`
-- `tests/test_llm_config.py`
-- `tests/test_llm_required.py`
+- `src/sigma_siphon/pipeline.py`
 
-Main behavior changes:
+## Added
 
-- zero-config built-in Overpass endpoint for ordinary use;
-- built-in OpenAI model and base URL;
-- only the API key remains a secret;
-- one-time beginner-friendly Windows setup script;
-- setup creates a permanent `sigma-siphon` command, so Conda activation is not
-  required during ordinary use;
-- default runs are rules-only and require no API key;
-- `--llm` explicitly enables the OpenAI fallback;
-- explicit LLM runs fail early if the key is missing;
-- `run.json` reports rule-vs-LLM classification counts;
-- version bumped from 0.1.3 to 0.1.4.
+- `setup-llm.ps1`
+
+## Main changes
+
+- Sigma Siphon installs into the Python environment that is already active.
+- No dedicated Conda environment is created.
+- Conda/Miniforge is never installed, reinstalled, updated, activated, or removed.
+- No custom permanent launcher is created.
+- The old Sigma Siphon launcher is removed by `setup.ps1` if it exists, so it
+  cannot shadow the command installed in the active environment.
+- The shortest install is `python -m pip install -e .`.
+- Default runtime remains rules-only: `sigma-siphon run pasig`.
+- OpenAI remains opt-in: `sigma-siphon run pasig --llm`.
+- OpenAI credential setup is moved to a separate optional `setup-llm.ps1`.
+- Version is bumped to 0.1.5.

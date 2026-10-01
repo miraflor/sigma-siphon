@@ -98,8 +98,8 @@ def run_pipeline(
     if use_llm and not LLMClassifier.is_configured():
         raise RuntimeError(
             "LLM classification is enabled, but SIGMA_LLM_API_KEY is not installed. "
-            "Run the repository's setup.ps1 to add an OpenAI API key, then open a "
-            "new PowerShell window. Otherwise run the normal command without --llm."
+            "Run setup-llm.ps1 from the repository to add an OpenAI API key, then open "
+            "a new PowerShell window. Otherwise run the normal command without --llm."
         )
 
     osm = fetch_osm(area.bbox, cache_root / "osm.parquet", refresh=refresh)
