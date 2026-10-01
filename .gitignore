@@ -1,27 +1,28 @@
+# Python
 __pycache__/
 *.py[cod]
 .pytest_cache/
 .ruff_cache/
+*.egg-info/
 .venv/
+
+# Local environment / secrets
 .env
 .env.*
 !.env.example
-.sigma-cache/
-output/
-*.egg-info/
+
+# Build artifacts
 dist/
 build/
 
-# Local boundary-build source inputs
-/data/source/
-/data/boundaries/PHL_ADM3_simplified.geojson
-
-# Generated/runtime data
+# Sigma Siphon runtime/download caches
 .sigma-cache/
 output/
 
-# Python/tool caches
-__pycache__/
-*.py[cod]
-.pytest_cache/
-.ruff_cache/
+# Large external/raw geodata inputs
+/data/source/
+/data/boundaries/PHL_ADM3_simplified.geojson
+
+# Large OSM working files — defense in depth
+*.osm.pbf
+node-locations.cache
