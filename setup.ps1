@@ -175,20 +175,21 @@ Write-Host "SETUP COMPLETE" -ForegroundColor Green
 Write-Host ""
 Write-Host "Close this terminal and open a NEW PowerShell window."
 Write-Host ""
+Write-Host "Normal free/default use:" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "    sigma-siphon run pasig" -ForegroundColor Yellow
+Write-Host ""
 
 $finalKey = [Environment]::GetEnvironmentVariable("SIGMA_LLM_API_KEY", "User")
 if (-not [string]::IsNullOrWhiteSpace($finalKey)) {
     Write-Host "OpenAI API key: configured"
-    Write-Host "Run the normal hybrid pipeline with:"
+    Write-Host "Optional LLM-enhanced use:"
     Write-Host ""
-    Write-Host "    sigma-siphon run pasig" -ForegroundColor Yellow
+    Write-Host "    sigma-siphon run pasig --llm" -ForegroundColor Yellow
 }
 else {
-    Write-Host "OpenAI API key: not configured"
-    Write-Host "Run the completely free rules-only test with:"
-    Write-Host ""
-    Write-Host "    sigma-siphon run pasig --no-llm" -ForegroundColor Yellow
-    Write-Host ""
-    Write-Host "When you want LLM classification, rerun setup.ps1 and add an API key."
+    Write-Host "OpenAI API key: not configured (this is fine)"
+    Write-Host "The default rules-only pipeline is fully usable."
+    Write-Host "If you later want LLM classification, rerun setup.ps1 and add a key."
 }
 Write-Host ""

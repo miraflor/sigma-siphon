@@ -83,7 +83,7 @@ def run_pipeline(
     cache_dir: Path | None = None,
     refresh: bool = False,
     clip: bool = True,
-    use_llm: bool = True,
+    use_llm: bool = False,
 ) -> tuple[Path, dict[str, object]]:
     started = time.monotonic()
     root = root.resolve()
@@ -93,13 +93,13 @@ def run_pipeline(
     cache_root.mkdir(parents=True, exist_ok=True)
     out_root.mkdir(parents=True, exist_ok=True)
 
-    # Normal runs are hybrid runs. Fail immediately rather than silently producing
-    # a rules-only result when the user expects LLM classification.
+    # The normal/default run is deterministic and requires no LLM credentials.
+    # Only an explicit --llm request activates hosted LLM classification.
     if use_llm and not LLMClassifier.is_configured():
         raise RuntimeError(
             "LLM classification is enabled, but SIGMA_LLM_API_KEY is not installed. "
-            "Run the repository's setup.ps1 once, then open a new PowerShell window. "
-            "Use --no-llm only when you intentionally want a rules-only diagnostic run."
+            "Run the repository's setup.ps1 to add an OpenAI API key, then open a "
+            "new PowerShell window. Otherwise run the normal command without --llm."
         )
 
     osm = fetch_osm(area.bbox, cache_root / "osm.parquet", refresh=refresh)

@@ -88,8 +88,8 @@ def doctor(
         console.print(f"LLM: configured — {model}")
     else:
         console.print(
-            "[yellow]LLM: NOT READY — API key is missing. "
-            "Run .\\setup.ps1 once.[/yellow]"
+            "LLM: optional — API key not configured "
+            "(default rules-only mode is ready)"
         )
 
 
@@ -113,9 +113,9 @@ def run_command(
         bool,
         typer.Option(
             "--llm/--no-llm",
-            help="Use the LLM for rows not handled by deterministic rules",
+            help="Optionally use the LLM for rows not handled by deterministic rules",
         ),
-    ] = True,
+    ] = False,
 ) -> None:
     try:
         target, report = run_pipeline(
@@ -147,7 +147,7 @@ def run_command(
     else:
         console.print(
             f"Classification: {classification['tagged_by_rule']:,} rules "
-            "(LLM deliberately disabled)"
+            "(default rules-only mode)"
         )
     console.print(f"Output: [bold]{target}[/bold]")
 

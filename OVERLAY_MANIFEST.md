@@ -31,7 +31,8 @@ Main behavior changes:
 - one-time beginner-friendly Windows setup script;
 - setup creates a permanent `sigma-siphon` command, so Conda activation is not
   required during ordinary use;
-- a normal LLM-enabled run now fails early if the key is missing instead of
-  silently falling back to rules-only;
+- default runs are rules-only and require no API key;
+- `--llm` explicitly enables the OpenAI fallback;
+- explicit LLM runs fail early if the key is missing;
 - `run.json` reports rule-vs-LLM classification counts;
 - version bumped from 0.1.3 to 0.1.4.
