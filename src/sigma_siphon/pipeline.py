@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import platform
 import time
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -13,6 +14,13 @@ from .industry import tag_places
 from .llm import LLMClassifier
 from .reconcile import reconcile
 from .sources import fetch_osm, fetch_overture
+
+ProgressCallback = Callable[[str], None]
+
+
+def _say(progress: ProgressCallback | None, message: str) -> None:
+    if progress is not None:
+        progress(message)
 
 
 def _boundary_report(area: Area, geometry) -> dict[str, object]:
@@ -84,17 +92,20 @@ def run_pipeline(
     refresh: bool = False,
     clip: bool = True,
     use_llm: bool = False,
+    progress: ProgressCallback | None = None,
 ) -> tuple[Path, dict[str, object]]:
     started = time.monotonic()
     root = root.resolve()
+
+    _say(progress, f"Resolving area: {area_slug}")
     area = resolve_area(area_slug, areas_file)
+    _say(progress, f"Area: {area.name} ({area.slug})")
+
     cache_root = (cache_dir or root / ".sigma-cache").resolve() / area.slug
     out_root = (output_dir or root / "output").resolve() / area.slug
     cache_root.mkdir(parents=True, exist_ok=True)
     out_root.mkdir(parents=True, exist_ok=True)
 
-    # The normal/default run is deterministic and requires no LLM credentials.
-    # Only an explicit --llm request activates hosted LLM classification.
     if use_llm and not LLMClassifier.is_configured():
         raise RuntimeError(
             "LLM classification is enabled, but SIGMA_LLM_API_KEY is not installed. "
@@ -102,16 +113,55 @@ def run_pipeline(
             "a new PowerShell window. Otherwise run the normal command without --llm."
         )
 
-    osm = fetch_osm(area.bbox, cache_root / "osm.parquet", refresh=refresh)
-    overture = fetch_overture(area.bbox, cache_root / "overture.parquet", refresh=refresh)
+    _say(progress, "[1/7] Acquiring OpenStreetMap POIs")
+    osm = fetch_osm(
+        area.bbox,
+        cache_root / "osm.parquet",
+        refresh=refresh,
+        progress=progress,
+    )
 
+    _say(progress, "[2/7] Acquiring Overture Places")
+    overture = fetch_overture(
+        area.bbox,
+        cache_root / "overture.parquet",
+        refresh=refresh,
+        progress=progress,
+    )
+
+    _say(progress, "[3/7] Loading exact administrative boundary")
     boundary = load_boundary(area)
     boundary_report = _boundary_report(area, boundary)
+
     if clip:
+        _say(
+            progress,
+            f"[4/7] Clipping source points to boundary "
+            f"(OSM {len(osm):,}, Overture {len(overture):,})",
+        )
+        osm_before = len(osm)
+        overture_before = len(overture)
         osm = clip_points(osm, boundary)
         overture = clip_points(overture, boundary)
+        _say(
+            progress,
+            f"Clipping complete — OSM {osm_before:,}→{len(osm):,}, "
+            f"Overture {overture_before:,}→{len(overture):,}",
+        )
+    else:
+        _say(progress, "[4/7] Boundary clipping disabled")
 
+    _say(progress, "[5/7] Reconciling OSM and Overture observations")
     canonical = reconcile(osm, overture, boundary=boundary if clip else None)
+    matched_two_source = (
+        int((canonical["source_count"] == 2).sum()) if len(canonical) else 0
+    )
+    _say(
+        progress,
+        f"Reconciliation complete — {len(canonical):,} canonical POIs, "
+        f"{matched_two_source:,} matched across both sources",
+    )
+
     if clip and len(canonical):
         inside = canonical.geometry.covered_by(boundary)
         if not bool(inside.all()):
@@ -119,6 +169,8 @@ def run_pipeline(
                 "canonical output contains coordinates outside the configured boundary"
             )
 
+    mode = "rules + LLM fallback" if use_llm else "deterministic rules only"
+    _say(progress, f"[6/7] Classifying POIs — {mode}")
     classifier = LLMClassifier.from_environment(cache_root / "llm.sqlite") if use_llm else None
     try:
         tagged = tag_places(canonical, llm=classifier)
@@ -126,6 +178,19 @@ def run_pipeline(
         if classifier is not None:
             classifier.close()
 
+    unresolved = int((tagged["io80_code"].fillna("") == "").sum()) if len(tagged) else 0
+    method_counts = (
+        tagged["tag_method"].fillna("").value_counts().to_dict()
+        if len(tagged)
+        else {}
+    )
+    _say(
+        progress,
+        f"Classification complete — {int(method_counts.get('rule', 0)):,} rules, "
+        f"{int(method_counts.get('llm', 0)):,} LLM, {unresolved:,} unresolved",
+    )
+
+    _say(progress, "[7/7] Writing output files")
     target = out_root / "pois.parquet"
     tagged.to_parquet(target, index=False)
 
@@ -136,12 +201,6 @@ def run_pipeline(
         _database_license_text(source_licenses), encoding="utf-8"
     )
 
-    unresolved = int((tagged["io80_code"].fillna("") == "").sum()) if len(tagged) else 0
-    method_counts = (
-        tagged["tag_method"].fillna("").value_counts().to_dict()
-        if len(tagged)
-        else {}
-    )
     report: dict[str, object] = {
         "package": "sigma-siphon",
         "version": __version__,
@@ -161,9 +220,7 @@ def run_pipeline(
             "osm": len(osm),
             "overture": len(overture),
             "canonical": len(canonical),
-            "matched_two_source": (
-                int((canonical["source_count"] == 2).sum()) if len(canonical) else 0
-            ),
+            "matched_two_source": matched_two_source,
             "tagged": len(tagged) - unresolved,
             "unresolved": unresolved,
         },
@@ -195,5 +252,10 @@ def run_pipeline(
     }
     (out_root / "run.json").write_text(
         json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    _say(
+        progress,
+        f"Output complete — {target} "
+        f"({report['elapsed_seconds']:.1f}s total)",
     )
     return target, report

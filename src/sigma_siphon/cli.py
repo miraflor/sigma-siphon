@@ -119,6 +119,9 @@ def run_command(
         ),
     ] = False,
 ) -> None:
+    def show_progress(message: str) -> None:
+        console.print(f"[cyan]→[/cyan] {message}")
+
     try:
         target, report = run_pipeline(
             area,
@@ -129,6 +132,7 @@ def run_command(
             refresh=refresh,
             clip=clip,
             use_llm=llm,
+            progress=show_progress,
         )
     except (KeyError, ValueError, FileNotFoundError, RuntimeError) as exc:
         console.print(f"[red]error:[/red] {exc}")

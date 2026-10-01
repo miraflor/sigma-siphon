@@ -4,6 +4,7 @@ import json
 import math
 import os
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 import geopandas as gpd
@@ -15,6 +16,8 @@ from ..licensing import OSM_LICENSE
 from ..settings import DEFAULT_OSM_OVERPASS_URL, DEFAULT_OSM_USER_AGENT
 from ..text import clean_text, combine
 from .cache import cache_matches_bbox, write_cache_identity
+
+ProgressCallback = Callable[[str], None]
 
 POI_KEYS = (
     "amenity",
@@ -37,6 +40,11 @@ VALUE_SELECTORS = {
     "railway": ("station", "halt", "tram_stop", "subway_entrance"),
 }
 CATEGORY_KEYS = (*POI_KEYS, *VALUE_SELECTORS)
+
+
+def _emit(progress: ProgressCallback | None, message: str) -> None:
+    if progress is not None:
+        progress(message)
 
 
 def _tiles(bbox: tuple[float, float, float, float], span: float = 0.18):
@@ -84,10 +92,17 @@ def _download_tile(
     endpoint: str,
     user_agent: str,
     retries: int = 4,
+    progress: ProgressCallback | None = None,
+    tile_label: str = "tile",
 ) -> dict:
     query = _query(bbox)
     last_error: Exception | None = None
-    for attempt in range(retries):
+    for attempt in range(1, retries + 1):
+        _emit(
+            progress,
+            f"OSM: {tile_label} — request attempt {attempt}/{retries} "
+            "(the Overpass server may take a few minutes)",
+        )
         try:
             response = session.post(
                 endpoint,
@@ -99,8 +114,14 @@ def _download_tile(
             return response.json()
         except (requests.RequestException, json.JSONDecodeError) as exc:
             last_error = exc
-            if attempt + 1 < retries:
-                time.sleep(2.0 * (attempt + 1))
+            if attempt < retries:
+                delay = 2.0 * attempt
+                _emit(
+                    progress,
+                    f"OSM: {tile_label} attempt {attempt} failed "
+                    f"({type(exc).__name__}); retrying in {delay:.0f}s",
+                )
+                time.sleep(delay)
     raise RuntimeError(f"OSM request failed after {retries} attempts: {last_error}")
 
 
@@ -122,6 +143,7 @@ def fetch_osm(
     cache_file: Path,
     *,
     refresh: bool = False,
+    progress: ProgressCallback | None = None,
 ) -> gpd.GeoDataFrame:
     """Fetch named OSM POIs using the built-in or overridden Overpass endpoint."""
     required = {
@@ -137,21 +159,30 @@ def fetch_osm(
     if not refresh and cache_matches_bbox(cache_file, bbox):
         cached = gpd.read_parquet(cache_file)
         if required.issubset(cached.columns):
+            _emit(progress, f"OSM: using compatible cache — {len(cached):,} POIs")
             return cached
 
     endpoint = _commercial_endpoint()
     user_agent = _user_agent()
     cache_file.parent.mkdir(parents=True, exist_ok=True)
     rows: dict[str, dict[str, object]] = {}
+
+    tiles = list(_tiles(bbox))
+    _emit(progress, f"OSM: downloading {len(tiles)} tile(s)")
+
     with requests.Session() as session:
-        for tile in _tiles(bbox):
+        for tile_number, tile in enumerate(tiles, start=1):
+            label = f"tile {tile_number}/{len(tiles)}"
             payload = _download_tile(
                 tile,
                 session=session,
                 endpoint=endpoint,
                 user_agent=user_agent,
+                progress=progress,
+                tile_label=label,
             )
-            for element in payload.get("elements", []):
+            elements = payload.get("elements", [])
+            for element in elements:
                 tags = element.get("tags") or {}
                 name = combine(tags.get("name"), tags.get("name:en"))
                 if not name:
@@ -177,6 +208,11 @@ def fetch_osm(
                     "upstream_license": OSM_LICENSE,
                     "overture_providers": "",
                 }
+            _emit(
+                progress,
+                f"OSM: {label} received {len(elements):,} objects; "
+                f"{len(rows):,} accepted named POIs so far",
+            )
 
     columns = [
         "source",
@@ -202,4 +238,5 @@ def fetch_osm(
     )
     gdf.to_parquet(cache_file, index=False)
     write_cache_identity(cache_file, bbox)
+    _emit(progress, f"OSM: complete — {len(gdf):,} POIs cached")
     return gdf

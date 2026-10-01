@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 import geopandas as gpd
@@ -9,6 +10,13 @@ from shapely import from_wkb
 from ..licensing import overture_record_allowed, overture_terms
 from ..text import clean_text, combine
 from .cache import cache_matches_bbox, write_cache_identity
+
+ProgressCallback = Callable[[str], None]
+
+
+def _emit(progress: ProgressCallback | None, message: str) -> None:
+    if progress is not None:
+        progress(message)
 
 
 def _primary_name(value: object) -> str:
@@ -59,25 +67,43 @@ def fetch_overture(
     cache_file: Path,
     *,
     refresh: bool = False,
+    progress: ProgressCallback | None = None,
 ) -> gpd.GeoDataFrame:
     """Stream Overture Places for bbox and cache a normalized point layer."""
     required = {
-        "source", "source_id", "name", "category", "lon", "lat",
-        "upstream_license", "overture_providers",
+        "source",
+        "source_id",
+        "name",
+        "category",
+        "lon",
+        "lat",
+        "upstream_license",
+        "overture_providers",
     }
     if not refresh and cache_matches_bbox(cache_file, bbox):
         cached = gpd.read_parquet(cache_file)
         if required.issubset(cached.columns):
+            _emit(progress, f"Overture: using compatible cache — {len(cached):,} POIs")
             return cached
 
     from overturemaps import record_batch_reader
 
     cache_file.parent.mkdir(parents=True, exist_ok=True)
+    _emit(
+        progress,
+        "Overture: opening Places stream "
+        "(the first response may take a little while)",
+    )
     reader = record_batch_reader("place", bbox=bbox, stac=True)
     records: list[dict[str, object]] = []
+    batch_number = 0
+    raw_total = 0
+
     if reader is not None:
-        for batch in reader:
+        for batch_number, batch in enumerate(reader, start=1):
             table = batch.to_pandas()
+            raw_total += len(table)
+            before = len(records)
             for _, row in table.iterrows():
                 status = clean_text(row.get("operating_status")).casefold()
                 if status == "permanently_closed":
@@ -109,10 +135,24 @@ def fetch_overture(
                         "geometry": point,
                     }
                 )
+            accepted = len(records) - before
+            _emit(
+                progress,
+                f"Overture: batch {batch_number} — {len(table):,} rows read, "
+                f"{accepted:,} accepted; {len(records):,} accepted total",
+            )
 
     columns = [
-        "source", "source_id", "name", "category", "lon", "lat", "provenance",
-        "upstream_license", "overture_providers", "geometry",
+        "source",
+        "source_id",
+        "name",
+        "category",
+        "lon",
+        "lat",
+        "provenance",
+        "upstream_license",
+        "overture_providers",
+        "geometry",
     ]
     frame = pd.DataFrame(records)
     if frame.empty:
@@ -120,4 +160,9 @@ def fetch_overture(
     gdf = gpd.GeoDataFrame(frame, geometry="geometry", crs="EPSG:4326")
     gdf.to_parquet(cache_file, index=False)
     write_cache_identity(cache_file, bbox)
+    _emit(
+        progress,
+        f"Overture: complete — {raw_total:,} rows read across {batch_number} batch(es), "
+        f"{len(gdf):,} POIs cached",
+    )
     return gdf
