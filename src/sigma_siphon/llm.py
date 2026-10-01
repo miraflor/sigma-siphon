@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from .settings import DEFAULT_LLM_BASE_URL, DEFAULT_LLM_MODEL
+
 if TYPE_CHECKING:
     from .industry import Industry
 
@@ -43,7 +45,8 @@ class DecisionCache:
 
     def get(self, signature: str, model_identity: str) -> LLMDecision | None:
         row = self.connection.execute(
-            "SELECT code, confidence, reason FROM decisions WHERE signature=? AND model_identity=?",
+            "SELECT code, confidence, reason FROM decisions "
+            "WHERE signature=? AND model_identity=?",
             (signature, model_identity),
         ).fetchone()
         return LLMDecision(str(row[0]), float(row[1]), str(row[2])) if row else None
@@ -78,20 +81,33 @@ class LLMClassifier:
             raise RuntimeError("LLM support requires the openai package") from exc
         self.client = OpenAI(**kwargs)
         self.model = model
-        self.base_url = (base_url or "https://api.openai.com/v1").rstrip("/")
+        self.base_url = (base_url or DEFAULT_LLM_BASE_URL).rstrip("/")
         self.cache = DecisionCache(cache_path)
         self.batch_size = max(1, batch_size)
 
+    @staticmethod
+    def is_configured() -> bool:
+        """Return whether the one required secret is available."""
+        return bool(os.getenv("SIGMA_LLM_API_KEY", "").strip())
+
     @classmethod
     def from_environment(cls, cache_path: Path) -> LLMClassifier | None:
-        model = os.getenv("SIGMA_LLM_MODEL", "").strip()
         api_key = os.getenv("SIGMA_LLM_API_KEY", "").strip()
-        if not model or not api_key:
+        if not api_key:
             return None
+
+        model = (
+            os.getenv("SIGMA_LLM_MODEL", DEFAULT_LLM_MODEL).strip()
+            or DEFAULT_LLM_MODEL
+        )
+        base_url = (
+            os.getenv("SIGMA_LLM_BASE_URL", DEFAULT_LLM_BASE_URL).strip()
+            or DEFAULT_LLM_BASE_URL
+        )
         return cls(
             model=model,
             api_key=api_key,
-            base_url=os.getenv("SIGMA_LLM_BASE_URL", "").strip() or None,
+            base_url=base_url,
             cache_path=cache_path,
         )
 
@@ -113,14 +129,17 @@ class LLMClassifier:
             "retail establishment sells a manufactured product. Public/private distinctions "
             "for education and health should be made only when the evidence supports them. "
             "If evidence is weak, still select the most plausible available industry but lower "
-            "confidence. Code 71 is valid when the evidence is genuinely about dwelling-ownership "
-            "services; use code 70 for other real-estate services. Return JSON only."
+            "confidence. Code 71 is valid when the evidence is genuinely about dwelling-"
+            "ownership services; use code 70 for other real-estate services. Return JSON only."
         )
         user = (
-            "Industries:\n" + industries + "\n\n"
-            "Items:\n" + json.dumps(items, ensure_ascii=False) + "\n\n"
-            "Return an object with key 'items'. Each item must contain: key, code, confidence "
-            "(0 to 1), and a short evidence-based reason. Do not return any code outside the list."
+            "Industries:\n"
+            + industries
+            + "\n\nItems:\n"
+            + json.dumps(items, ensure_ascii=False)
+            + "\n\nReturn an object with key 'items'. Each item must contain: key, code, "
+            "confidence (0 to 1), and a short evidence-based reason. Do not return any code "
+            "outside the list."
         )
         return system, user
 
@@ -138,11 +157,22 @@ class LLMClassifier:
 
     def _call(self, batch, catalog: dict[str, Industry]) -> dict[int, LLMDecision]:
         system, user = self._prompt(batch, catalog)
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
-            temperature=0,
-        )
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+                temperature=0,
+            )
+        except Exception as exc:
+            raise RuntimeError(
+                "LLM request failed. Check the internet connection, OpenAI API key, "
+                "project permissions, billing/quota, and model access. "
+                f"Provider error: {type(exc).__name__}: {exc}"
+            ) from exc
+
         content = response.choices[0].message.content or ""
         payload = self._json(content)
         expected = {str(pos) for pos, _, _ in batch}
@@ -153,7 +183,10 @@ class LLMClassifier:
             if key not in expected or code not in catalog:
                 continue
             try:
-                confidence = min(1.0, max(0.0, float(item.get("confidence", 0.0))))
+                confidence = min(
+                    1.0,
+                    max(0.0, float(item.get("confidence", 0.0))),
+                )
             except (TypeError, ValueError):
                 confidence = 0.0
             decisions[int(key)] = LLMDecision(

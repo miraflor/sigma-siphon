@@ -4,12 +4,25 @@ Sigma Siphon directly acquires two POI sources.
 
 ## OpenStreetMap
 
-Named establishment-relevant objects are requested from a user-configured Overpass endpoint and normalized to representative points. Broad railway/aeroway selectors are intentionally avoided; only establishment-like station, halt, terminal and aerodrome values are queried for those keys.
+Named establishment-relevant objects are requested through Overpass and normalized to representative points. Broad railway/aeroway selectors are intentionally avoided; only establishment-like station, halt, terminal and aerodrome values are queried for those keys.
 
-The data are licensed under ODbL 1.0. Commercial use is permitted subject to the ODbL conditions. The code does not default to volunteer public Overpass infrastructure; commercial deployments must configure an endpoint whose service terms permit the intended workload.
+The data are licensed under ODbL 1.0. Commercial use is permitted subject to the ODbL conditions.
+
+For ordinary small-team deployment, Sigma Siphon ships with this built-in Overpass endpoint:
+
+```text
+https://overpass.private.coffee/api/interpreter
+```
+
+At the time this default was reviewed (2026-10-01), the OpenStreetMap Overpass instance list stated that Private.coffee may be used for any project and had no rate limit, while asking users to notify the operator in advance for large-scale projects.
+
+A deployment maintainer may override the endpoint with `SIGMA_OSM_OVERPASS_URL` without changing source code. Ordinary users should not need to configure an endpoint.
+
+Because external service policies can change independently of this repository, maintainers should re-check the endpoint policy periodically and before materially increasing workload.
 
 - OSM copyright and attribution: https://www.openstreetmap.org/copyright
 - ODbL 1.0: https://opendatacommons.org/licenses/odbl/1-0/
+- Overpass instances and current usage policies: https://wiki.openstreetmap.org/wiki/Overpass_API
 
 ## Overture Maps Places
 
@@ -19,7 +32,6 @@ The provider intentionally outside this project's source policy is filtered out 
 
 - Overture Places guide: https://docs.overturemaps.org/guides/places/
 - Overture attribution and licensing: https://docs.overturemaps.org/attribution/
-
 
 ## Administrative boundaries and PSGC
 

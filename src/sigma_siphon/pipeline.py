@@ -69,8 +69,8 @@ def _database_license_text(source_licenses: list[str]) -> str:
         "OpenStreetMap-derived records.\n\n"
         "OpenStreetMap attribution: © OpenStreetMap contributors.\n"
         "ODbL 1.0: https://opendatacommons.org/licenses/odbl/1-0/\n\n"
-        "Individual Overture-origin source content retains its applicable upstream provider terms. "
-        "See ATTRIBUTION.txt and the per-row source_licenses field.\n"
+        "Individual Overture-origin source content retains its applicable upstream provider "
+        "terms. See ATTRIBUTION.txt and the per-row source_licenses field.\n"
     )
 
 
@@ -92,6 +92,15 @@ def run_pipeline(
     out_root = (output_dir or root / "output").resolve() / area.slug
     cache_root.mkdir(parents=True, exist_ok=True)
     out_root.mkdir(parents=True, exist_ok=True)
+
+    # Normal runs are hybrid runs. Fail immediately rather than silently producing
+    # a rules-only result when the user expects LLM classification.
+    if use_llm and not LLMClassifier.is_configured():
+        raise RuntimeError(
+            "LLM classification is enabled, but SIGMA_LLM_API_KEY is not installed. "
+            "Run the repository's setup.ps1 once, then open a new PowerShell window. "
+            "Use --no-llm only when you intentionally want a rules-only diagnostic run."
+        )
 
     osm = fetch_osm(area.bbox, cache_root / "osm.parquet", refresh=refresh)
     overture = fetch_overture(area.bbox, cache_root / "overture.parquet", refresh=refresh)
@@ -128,6 +137,11 @@ def run_pipeline(
     )
 
     unresolved = int((tagged["io80_code"].fillna("") == "").sum()) if len(tagged) else 0
+    method_counts = (
+        tagged["tag_method"].fillna("").value_counts().to_dict()
+        if len(tagged)
+        else {}
+    )
     report: dict[str, object] = {
         "package": "sigma-siphon",
         "version": __version__,
@@ -157,6 +171,9 @@ def run_pipeline(
             "llm_enabled": classifier is not None,
             "llm_model": classifier.model if classifier is not None else None,
             "llm_base_url": classifier.base_url if classifier is not None else None,
+            "tagged_by_rule": int(method_counts.get("rule", 0)),
+            "tagged_by_llm": int(method_counts.get("llm", 0)),
+            "unresolved": int(method_counts.get("unresolved", 0)),
             "deterministic_first": True,
             "io80_primary": True,
             "io16_derived_from_io80": True,
@@ -164,7 +181,9 @@ def run_pipeline(
         },
         "licensing": {
             "software": "Proprietary",
-            "database_license": "ODbL-1.0" if "ODbL-1.0" in source_licenses else None,
+            "database_license": (
+                "ODbL-1.0" if "ODbL-1.0" in source_licenses else None
+            ),
             "source_licenses_observed": source_licenses,
             "overture_providers_observed": overture_providers,
             "osm_public_distribution_note": (

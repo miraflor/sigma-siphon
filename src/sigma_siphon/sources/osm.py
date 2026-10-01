@@ -12,6 +12,7 @@ import requests
 from shapely.geometry import Point
 
 from ..licensing import OSM_LICENSE
+from ..settings import DEFAULT_OSM_OVERPASS_URL, DEFAULT_OSM_USER_AGENT
 from ..text import clean_text, combine
 from .cache import cache_matches_bbox, write_cache_identity
 
@@ -62,18 +63,18 @@ def _query(bbox: tuple[float, float, float, float]) -> str:
 
 
 def _commercial_endpoint() -> str:
-    endpoint = os.getenv("SIGMA_OSM_OVERPASS_URL", "").strip()
-    if not endpoint:
-        raise RuntimeError(
-            "SIGMA_OSM_OVERPASS_URL is required. Configure a self-hosted or paid Overpass "
-            "endpoint whose service terms permit your commercial workload. Sigma Siphon does "
-            "not default to volunteer-operated public Overpass infrastructure."
-        )
-    return endpoint
+    """Return the built-in Overpass endpoint unless deployment overrides it."""
+    return (
+        os.getenv("SIGMA_OSM_OVERPASS_URL", DEFAULT_OSM_OVERPASS_URL).strip()
+        or DEFAULT_OSM_OVERPASS_URL
+    )
 
 
 def _user_agent() -> str:
-    return os.getenv("SIGMA_OSM_USER_AGENT", "SigmaSiphon/0.1.3").strip() or "SigmaSiphon/0.1.3"
+    return (
+        os.getenv("SIGMA_OSM_USER_AGENT", DEFAULT_OSM_USER_AGENT).strip()
+        or DEFAULT_OSM_USER_AGENT
+    )
 
 
 def _download_tile(
@@ -122,10 +123,16 @@ def fetch_osm(
     *,
     refresh: bool = False,
 ) -> gpd.GeoDataFrame:
-    """Fetch named OSM POIs from a configured commercial-ready Overpass endpoint."""
+    """Fetch named OSM POIs using the built-in or overridden Overpass endpoint."""
     required = {
-        "source", "source_id", "name", "category", "lon", "lat",
-        "upstream_license", "overture_providers",
+        "source",
+        "source_id",
+        "name",
+        "category",
+        "lon",
+        "lat",
+        "upstream_license",
+        "overture_providers",
     }
     if not refresh and cache_matches_bbox(cache_file, bbox):
         cached = gpd.read_parquet(cache_file)
@@ -172,8 +179,15 @@ def fetch_osm(
                 }
 
     columns = [
-        "source", "source_id", "name", "category", "lon", "lat", "provenance",
-        "upstream_license", "overture_providers",
+        "source",
+        "source_id",
+        "name",
+        "category",
+        "lon",
+        "lat",
+        "provenance",
+        "upstream_license",
+        "overture_providers",
     ]
     frame = pd.DataFrame(rows.values())
     if frame.empty:

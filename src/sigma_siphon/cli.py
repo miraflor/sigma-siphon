@@ -10,7 +10,9 @@ from rich.table import Table
 
 from . import __version__
 from .areas import load_areas
+from .llm import LLMClassifier
 from .pipeline import run_pipeline
+from .settings import DEFAULT_LLM_MODEL, DEFAULT_OSM_OVERPASS_URL
 
 app = typer.Typer(
     add_completion=False,
@@ -52,12 +54,14 @@ def doctor(
     areas_file: Annotated[Path | None, typer.Option(help="Alternate areas YAML")] = None,
 ) -> None:
     areas = load_areas(areas_file)
-    llm_ready = bool(os.getenv("SIGMA_LLM_MODEL") and os.getenv("SIGMA_LLM_API_KEY"))
-    osm_ready = bool(os.getenv("SIGMA_OSM_OVERPASS_URL"))
+    llm_ready = LLMClassifier.is_configured()
+    osm_override = bool(os.getenv("SIGMA_OSM_OVERPASS_URL", "").strip())
+
     console.print(f"sigma-siphon {__version__}")
     localities = sum(area.kind in {"city", "municipality"} for area in areas.values())
     composites = sum(area.kind == "composite" for area in areas.values())
     console.print(f"Areas: {len(areas)} ({localities} localities + {composites} composites)")
+
     boundary_files = {
         area.boundary.gpkg
         for area in areas.values()
@@ -71,8 +75,22 @@ def doctor(
     if missing_boundaries:
         for path in missing_boundaries:
             console.print(f"  missing: {path}")
-    console.print(f"OSM endpoint: {'configured' if osm_ready else 'not configured'}")
-    console.print(f"LLM: {'configured' if llm_ready else 'not configured (rules-only fallback)'}")
+
+    endpoint_label = (
+        "deployment override"
+        if osm_override
+        else f"built-in default ({DEFAULT_OSM_OVERPASS_URL})"
+    )
+    console.print(f"OSM endpoint: ready — {endpoint_label}")
+
+    if llm_ready:
+        model = os.getenv("SIGMA_LLM_MODEL", DEFAULT_LLM_MODEL).strip() or DEFAULT_LLM_MODEL
+        console.print(f"LLM: configured — {model}")
+    else:
+        console.print(
+            "[yellow]LLM: NOT READY — API key is missing. "
+            "Run .\\setup.ps1 once.[/yellow]"
+        )
 
 
 @app.command("run")
@@ -93,7 +111,10 @@ def run_command(
     ] = True,
     llm: Annotated[
         bool,
-        typer.Option("--llm/--no-llm", help="Use configured LLM for rows not handled by rules"),
+        typer.Option(
+            "--llm/--no-llm",
+            help="Use the LLM for rows not handled by deterministic rules",
+        ),
     ] = True,
 ) -> None:
     try:
@@ -112,15 +133,22 @@ def run_command(
         raise typer.Exit(1) from exc
 
     counts = report["counts"]
-    if llm and not report["classification"]["llm_enabled"]:
-        console.print(
-            "[yellow]LLM credentials are not configured; unresolved rows were left blank. "
-            "Set SIGMA_LLM_MODEL and SIGMA_LLM_API_KEY, then rerun.[/yellow]"
-        )
+    classification = report["classification"]
     console.print(
         f"[green]Complete[/green]: {counts['canonical']:,} POIs, "
         f"{counts['tagged']:,} tagged, {counts['unresolved']:,} unresolved"
     )
+    if classification["llm_enabled"]:
+        console.print(
+            "Classification: "
+            f"{classification['tagged_by_rule']:,} rules + "
+            f"{classification['tagged_by_llm']:,} LLM"
+        )
+    else:
+        console.print(
+            f"Classification: {classification['tagged_by_rule']:,} rules "
+            "(LLM deliberately disabled)"
+        )
     console.print(f"Output: [bold]{target}[/bold]")
 
 
