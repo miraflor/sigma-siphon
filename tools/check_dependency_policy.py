@@ -9,6 +9,7 @@ AUDITED_BUILD = ("hatchling>=1.25,<2",)
 AUDITED_RUNTIME = (
     "geopandas>=1.0,<2",
     "openai>=1.50,<4",
+    "osmium>=4.3,<5",
     "overturemaps>=1.0.2,<2",
     "pandas>=2.2,<4",
     "pyarrow>=16,<27",

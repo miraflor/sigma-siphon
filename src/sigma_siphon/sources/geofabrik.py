@@ -4,10 +4,10 @@ import hashlib
 import json
 import os
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Callable
 from urllib.parse import urljoin, urlparse
 
 import requests

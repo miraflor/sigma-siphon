@@ -37,7 +37,8 @@ def test_explicit_llm_run_requires_key_before_network(monkeypatch, tmp_path: Pat
     def unexpected_network(*args, **kwargs):
         raise AssertionError("network acquisition should not start before LLM preflight")
 
-    monkeypatch.setattr(pipeline, "fetch_osm", unexpected_network)
+    monkeypatch.setattr(pipeline, "ensure", unexpected_network)
+    monkeypatch.setattr(pipeline, "load_prepared_area_osm", unexpected_network)
     monkeypatch.setattr(pipeline, "fetch_overture", unexpected_network)
 
     with pytest.raises(RuntimeError, match="SIGMA_LLM_API_KEY"):

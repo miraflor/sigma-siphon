@@ -25,10 +25,21 @@ def _source(source: str, sid: str, name: str, category: str):
 
 
 def test_end_to_end_without_network(monkeypatch, tmp_path: Path):
+    pbf_file = tmp_path / "philippines-latest.osm.pbf"
+    pbf_file.touch()
     monkeypatch.setattr(
         pipeline,
-        "fetch_osm",
-        lambda *args, **kwargs: _source("osm", "node/1", "Sample Bank", "amenity=bank"),
+        "ensure",
+        lambda *args, **kwargs: pbf_file,
+    )
+    monkeypatch.setattr(
+        pipeline,
+        "load_prepared_area_osm",
+        lambda *args, **kwargs: (
+            _source("osm", "node/1", "Sample Bank", "amenity=bank"),
+            "test-version",
+            False,
+        ),
     )
     monkeypatch.setattr(
         pipeline,

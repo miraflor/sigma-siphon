@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import shutil
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
@@ -840,7 +839,10 @@ def prepare_all_area_osm_caches(
 
     # Do not disturb the previous live prepared version until validation has passed.
     if final_dir.exists():
-        quarantine = prepared_root / f".{version}.invalid-{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}"
+        quarantine = (
+            prepared_root
+            / f".{version}.invalid-{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}"
+        )
         final_dir.replace(quarantine)
 
     work_dir.replace(final_dir)
