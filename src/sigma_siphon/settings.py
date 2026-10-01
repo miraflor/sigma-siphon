@@ -1,13 +1,8 @@
-"""Application defaults for ordinary Sigma Siphon deployments.
+"""Application defaults for ordinary Sigma Siphon deployments."""
 
-Normal users should not need to know provider endpoints or model names.
-Environment variables remain available as deployment-time overrides.
-
-Secrets are intentionally not stored here.
-"""
-
-DEFAULT_OSM_OVERPASS_URL = "https://overpass.private.coffee/api/interpreter"
-DEFAULT_OSM_USER_AGENT = "SigmaSiphon/0.1.5"
+DEFAULT_GEOFABRIK_PAGE_URL = "https://download.geofabrik.de/asia/philippines.html"
+DEFAULT_GEOFABRIK_MAX_AGE_DAYS = 7.0
+DEFAULT_DOWNLOAD_USER_AGENT = "SigmaSiphon/0.2.0"
 
 DEFAULT_LLM_MODEL = "gpt-5.6-luna"
 DEFAULT_LLM_BASE_URL = "https://api.openai.com/v1"

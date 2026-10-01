@@ -13,7 +13,7 @@ from .boundary import boundary_identity, clip_points, load_boundary
 from .industry import tag_places
 from .llm import LLMClassifier
 from .reconcile import reconcile
-from .sources import fetch_osm, fetch_overture
+from .sources import ensure, fetch_overture, load_prepared_area_osm
 
 ProgressCallback = Callable[[str], None]
 
@@ -40,9 +40,11 @@ def _attribution_text(tagged) -> str:
         [
             "Sigma Siphon output source attribution",
             "",
-            "OpenStreetMap",
+            "OpenStreetMap / Geofabrik",
             "Contains information from OpenStreetMap contributors, available under ODbL 1.0.",
+            "Philippines extract obtained from Geofabrik GmbH.",
             "https://www.openstreetmap.org/copyright",
+            "https://download.geofabrik.de/asia/philippines.html",
             "",
             "Overture Maps Places",
             "Contains data obtained from Overture Maps Foundation Places.",
@@ -76,6 +78,7 @@ def _database_license_text(source_licenses: list[str]) -> str:
         "as the project's conservative compliance posture for a reconciled database containing "
         "OpenStreetMap-derived records.\n\n"
         "OpenStreetMap attribution: © OpenStreetMap contributors.\n"
+        "Geofabrik extract: https://download.geofabrik.de/asia/philippines.html\n"
         "ODbL 1.0: https://opendatacommons.org/licenses/odbl/1-0/\n\n"
         "Individual Overture-origin source content retains its applicable upstream provider "
         "terms. See ATTRIBUTION.txt and the per-row source_licenses field.\n"
@@ -90,6 +93,7 @@ def run_pipeline(
     output_dir: Path | None = None,
     cache_dir: Path | None = None,
     refresh: bool = False,
+    refresh_geofabrik: bool = False,
     clip: bool = True,
     use_llm: bool = False,
     progress: ProgressCallback | None = None,
@@ -101,7 +105,8 @@ def run_pipeline(
     area = resolve_area(area_slug, areas_file)
     _say(progress, f"Area: {area.name} ({area.slug})")
 
-    cache_root = (cache_dir or root / ".sigma-cache").resolve() / area.slug
+    cache_base = (cache_dir or root / ".sigma-cache").resolve()
+    cache_root = cache_base / area.slug
     out_root = (output_dir or root / "output").resolve() / area.slug
     cache_root.mkdir(parents=True, exist_ok=True)
     out_root.mkdir(parents=True, exist_ok=True)
@@ -113,15 +118,23 @@ def run_pipeline(
             "a new PowerShell window. Otherwise run the normal command without --llm."
         )
 
-    _say(progress, "[1/7] Acquiring OpenStreetMap POIs")
-    osm = fetch_osm(
-        area.bbox,
-        cache_root / "osm.parquet",
-        refresh=refresh,
+    _say(progress, "[1/8] Preparing Geofabrik Philippines OSM extract")
+    pbf_file = ensure(
+        cache_base,
+        refresh=refresh_geofabrik,
         progress=progress,
     )
 
-    _say(progress, "[2/7] Acquiring Overture Places")
+    _say(progress, "[2/8] Loading prepared all-LGU OSM cache")
+    osm, osm_source_version, osm_fallback = load_prepared_area_osm(
+        cache_base=cache_base,
+        pbf_file=pbf_file,
+        area_slug=area.slug,
+        areas_file=areas_file,
+        progress=progress,
+    )
+
+    _say(progress, "[3/8] Acquiring Overture Places")
     overture = fetch_overture(
         area.bbox,
         cache_root / "overture.parquet",
@@ -129,14 +142,14 @@ def run_pipeline(
         progress=progress,
     )
 
-    _say(progress, "[3/7] Loading exact administrative boundary")
+    _say(progress, "[4/8] Loading exact administrative boundary")
     boundary = load_boundary(area)
     boundary_report = _boundary_report(area, boundary)
 
     if clip:
         _say(
             progress,
-            f"[4/7] Clipping source points to boundary "
+            f"[5/8] Verifying exact boundary clip "
             f"(OSM {len(osm):,}, Overture {len(overture):,})",
         )
         osm_before = len(osm)
@@ -145,13 +158,13 @@ def run_pipeline(
         overture = clip_points(overture, boundary)
         _say(
             progress,
-            f"Clipping complete — OSM {osm_before:,}→{len(osm):,}, "
+            f"Boundary verification complete — OSM {osm_before:,}→{len(osm):,}, "
             f"Overture {overture_before:,}→{len(overture):,}",
         )
     else:
-        _say(progress, "[4/7] Boundary clipping disabled")
+        _say(progress, "[5/8] Boundary clipping disabled")
 
-    _say(progress, "[5/7] Reconciling OSM and Overture observations")
+    _say(progress, "[6/8] Reconciling OSM and Overture observations")
     canonical = reconcile(osm, overture, boundary=boundary if clip else None)
     matched_two_source = (
         int((canonical["source_count"] == 2).sum()) if len(canonical) else 0
@@ -170,7 +183,7 @@ def run_pipeline(
             )
 
     mode = "rules + LLM fallback" if use_llm else "deterministic rules only"
-    _say(progress, f"[6/7] Classifying POIs — {mode}")
+    _say(progress, f"[7/8] Classifying POIs — {mode}")
     classifier = LLMClassifier.from_environment(cache_root / "llm.sqlite") if use_llm else None
     try:
         tagged = tag_places(canonical, llm=classifier)
@@ -190,7 +203,7 @@ def run_pipeline(
         f"{int(method_counts.get('llm', 0)):,} LLM, {unresolved:,} unresolved",
     )
 
-    _say(progress, "[7/7] Writing output files")
+    _say(progress, "[8/8] Writing output files")
     target = out_root / "pois.parquet"
     tagged.to_parquet(target, index=False)
 
@@ -215,7 +228,7 @@ def run_pipeline(
         },
         "boundary": boundary_report,
         "clip_enabled": bool(clip),
-        "sources": ["osm", "overture"],
+        "sources": ["osm-geofabrik-prepared", "overture"],
         "counts": {
             "osm": len(osm),
             "overture": len(overture),
@@ -236,6 +249,18 @@ def run_pipeline(
             "io16_derived_from_io80": True,
             "io80_code_71_allowed": True,
         },
+        "osm_acquisition": {
+            "provider": "Geofabrik",
+            "preparation": (
+                "resumable checkpoints; one national scan per Geofabrik version; "
+                "all LGU caches"
+            ),
+            "pbf": str(pbf_file),
+            "pbf_size_bytes": pbf_file.stat().st_size,
+            "prepared_source_version": osm_source_version,
+            "fallback_to_previous_complete_version": bool(osm_fallback),
+            "geofabrik_refreshed_for_run": bool(refresh_geofabrik),
+        },
         "licensing": {
             "software": "Proprietary",
             "database_license": (
@@ -251,11 +276,11 @@ def run_pipeline(
         "output": str(target),
     }
     (out_root / "run.json").write_text(
-        json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        json.dumps(report, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
     )
     _say(
         progress,
-        f"Output complete — {target} "
-        f"({report['elapsed_seconds']:.1f}s total)",
+        f"Output complete — {target} ({report['elapsed_seconds']:.1f}s total)",
     )
     return target, report

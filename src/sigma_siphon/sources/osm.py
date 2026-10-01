@@ -1,21 +1,15 @@
 from __future__ import annotations
 
-import json
-import math
-import os
-import time
 from collections.abc import Callable
 from pathlib import Path
 
 import geopandas as gpd
 import pandas as pd
-import requests
+import shapely.wkb
 from shapely.geometry import Point
 
 from ..licensing import OSM_LICENSE
-from ..settings import DEFAULT_OSM_OVERPASS_URL, DEFAULT_OSM_USER_AGENT
 from ..text import clean_text, combine
-from .cache import cache_matches_bbox, write_cache_identity
 
 ProgressCallback = Callable[[str], None]
 
@@ -34,12 +28,24 @@ POI_KEYS = (
     "public_transport",
 )
 
-# Avoid turning named railway lines, tracks, runways, etc. into establishments.
 VALUE_SELECTORS = {
     "aeroway": ("aerodrome", "terminal"),
     "railway": ("station", "halt", "tram_stop", "subway_entrance"),
 }
 CATEGORY_KEYS = (*POI_KEYS, *VALUE_SELECTORS)
+
+OSM_COLUMNS = [
+    "source",
+    "source_id",
+    "name",
+    "category",
+    "lon",
+    "lat",
+    "provenance",
+    "upstream_license",
+    "overture_providers",
+    "geometry",
+]
 
 
 def _emit(progress: ProgressCallback | None, message: str) -> None:
@@ -47,85 +53,20 @@ def _emit(progress: ProgressCallback | None, message: str) -> None:
         progress(message)
 
 
-def _tiles(bbox: tuple[float, float, float, float], span: float = 0.18):
-    west, south, east, north = bbox
-    y = south
-    while y < north:
-        y2 = min(north, y + span)
-        x = west
-        while x < east:
-            x2 = min(east, x + span)
-            yield (x, y, x2, y2)
-            x = x2
-        y = y2
-
-
-def _query(bbox: tuple[float, float, float, float]) -> str:
-    west, south, east, north = bbox
-    s = f"{south},{west},{north},{east}"
-    selectors = [f'nwr["name"]["{key}"]({s});' for key in POI_KEYS]
+def _has_poi(tags) -> bool:
+    if not combine(tags.get("name"), tags.get("name:en")):
+        return False
+    for key in POI_KEYS:
+        if clean_text(tags.get(key)):
+            return True
     for key, values in VALUE_SELECTORS.items():
-        pattern = "|".join(values)
-        selectors.append(f'nwr["name"]["{key}"~"^({pattern})$"]({s});')
-    return "[out:json][timeout:180];(\n" + "\n".join(selectors) + "\n);out center tags;"
+        value = clean_text(tags.get(key))
+        if value in values:
+            return True
+    return False
 
 
-def _commercial_endpoint() -> str:
-    """Return the built-in Overpass endpoint unless deployment overrides it."""
-    return (
-        os.getenv("SIGMA_OSM_OVERPASS_URL", DEFAULT_OSM_OVERPASS_URL).strip()
-        or DEFAULT_OSM_OVERPASS_URL
-    )
-
-
-def _user_agent() -> str:
-    return (
-        os.getenv("SIGMA_OSM_USER_AGENT", DEFAULT_OSM_USER_AGENT).strip()
-        or DEFAULT_OSM_USER_AGENT
-    )
-
-
-def _download_tile(
-    bbox: tuple[float, float, float, float],
-    *,
-    session: requests.Session,
-    endpoint: str,
-    user_agent: str,
-    retries: int = 4,
-    progress: ProgressCallback | None = None,
-    tile_label: str = "tile",
-) -> dict:
-    query = _query(bbox)
-    last_error: Exception | None = None
-    for attempt in range(1, retries + 1):
-        _emit(
-            progress,
-            f"OSM: {tile_label} — request attempt {attempt}/{retries} "
-            "(the Overpass server may take a few minutes)",
-        )
-        try:
-            response = session.post(
-                endpoint,
-                data={"data": query},
-                timeout=(20, 240),
-                headers={"User-Agent": user_agent},
-            )
-            response.raise_for_status()
-            return response.json()
-        except (requests.RequestException, json.JSONDecodeError) as exc:
-            last_error = exc
-            if attempt < retries:
-                delay = 2.0 * attempt
-                _emit(
-                    progress,
-                    f"OSM: {tile_label} attempt {attempt} failed "
-                    f"({type(exc).__name__}); retrying in {delay:.0f}s",
-                )
-                time.sleep(delay)
-    raise RuntimeError(f"OSM request failed after {retries} attempts: {last_error}")
-
-
-def _category(tags: dict[str, object]) -> str:
+def _category(tags) -> str:
     parts = []
     for key in CATEGORY_KEYS:
         value = clean_text(tags.get(key))
@@ -138,105 +79,155 @@ def _category(tags: dict[str, object]) -> str:
     return " | ".join(parts)
 
 
-def fetch_osm(
-    bbox: tuple[float, float, float, float],
-    cache_file: Path,
+def _empty_osm() -> gpd.GeoDataFrame:
+    frame = pd.DataFrame(columns=OSM_COLUMNS)
+    return gpd.GeoDataFrame(frame, geometry="geometry", crs="EPSG:4326")
+
+
+def extract_national_osm_pois(
+    pbf_file: Path,
     *,
-    refresh: bool = False,
+    node_cache: Path,
     progress: ProgressCallback | None = None,
 ) -> gpd.GeoDataFrame:
-    """Fetch named OSM POIs using the built-in or overridden Overpass endpoint."""
-    required = {
-        "source",
-        "source_id",
-        "name",
-        "category",
-        "lon",
-        "lat",
-        "upstream_license",
-        "overture_providers",
-    }
-    if not refresh and cache_matches_bbox(cache_file, bbox):
-        cached = gpd.read_parquet(cache_file)
-        if required.issubset(cached.columns):
-            _emit(progress, f"OSM: using compatible cache — {len(cached):,} POIs")
-            return cached
+    """Scan the Philippines PBF once and return all named POI candidates."""
+    try:
+        import osmium
+    except ModuleNotFoundError as exc:
+        raise RuntimeError(
+            "Local OSM extraction requires the 'osmium' Python package. "
+            "Run: python -m pip install -e ."
+        ) from exc
 
-    endpoint = _commercial_endpoint()
-    user_agent = _user_agent()
-    cache_file.parent.mkdir(parents=True, exist_ok=True)
-    rows: dict[str, dict[str, object]] = {}
+    node_cache.parent.mkdir(parents=True, exist_ok=True)
+    index_spec = f"sparse_file_array,{node_cache}"
+    wkbfab = osmium.geom.WKBFactory()
 
-    tiles = list(_tiles(bbox))
-    _emit(progress, f"OSM: downloading {len(tiles)} tile(s)")
+    _emit(
+        progress,
+        "OSM preparation: scanning the Philippines PBF once for nationwide named POIs",
+    )
 
-    with requests.Session() as session:
-        for tile_number, tile in enumerate(tiles, start=1):
-            label = f"tile {tile_number}/{len(tiles)}"
-            payload = _download_tile(
-                tile,
-                session=session,
-                endpoint=endpoint,
-                user_agent=user_agent,
-                progress=progress,
-                tile_label=label,
-            )
-            elements = payload.get("elements", [])
-            for element in elements:
-                tags = element.get("tags") or {}
-                name = combine(tags.get("name"), tags.get("name:en"))
-                if not name:
-                    continue
-                lon = element.get("lon")
-                lat = element.get("lat")
-                center = element.get("center") or {}
-                lon = lon if lon is not None else center.get("lon")
-                lat = lat if lat is not None else center.get("lat")
-                if lon is None or lat is None or not (
-                    math.isfinite(float(lon)) and math.isfinite(float(lat))
-                ):
-                    continue
-                source_id = f"{element.get('type', 'object')}/{element.get('id')}"
-                rows[source_id] = {
-                    "source": "osm",
-                    "source_id": source_id,
-                    "name": name,
-                    "category": _category(tags),
-                    "lon": float(lon),
-                    "lat": float(lat),
-                    "provenance": "OpenStreetMap contributors",
-                    "upstream_license": OSM_LICENSE,
-                    "overture_providers": "",
-                }
-            _emit(
-                progress,
-                f"OSM: {label} received {len(elements):,} objects; "
-                f"{len(rows):,} accepted named POIs so far",
+    class POIHandler(osmium.SimpleHandler):
+        def __init__(self):
+            super().__init__()
+            self.rows: dict[str, dict[str, object]] = {}
+            self.objects_seen = 0
+            self.next_report = 1_000_000
+
+        def _tick(self) -> None:
+            self.objects_seen += 1
+            if self.objects_seen >= self.next_report:
+                _emit(
+                    progress,
+                    f"OSM preparation: {self.objects_seen:,} objects examined; "
+                    f"{len(self.rows):,} nationwide POI candidates retained",
+                )
+                self.next_report += 1_000_000
+
+        def _add(self, source_id: str, tags, lon: float, lat: float) -> None:
+            name = combine(tags.get("name"), tags.get("name:en"))
+            if not name:
+                return
+            self.rows[source_id] = {
+                "source": "osm",
+                "source_id": source_id,
+                "name": name,
+                "category": _category(tags),
+                "lon": lon,
+                "lat": lat,
+                "provenance": "OpenStreetMap contributors via Geofabrik",
+                "upstream_license": OSM_LICENSE,
+                "overture_providers": "",
+            }
+
+        def node(self, node) -> None:
+            self._tick()
+            if not _has_poi(node.tags) or not node.location.valid():
+                return
+            self._add(
+                f"node/{node.id}",
+                node.tags,
+                float(node.location.lon),
+                float(node.location.lat),
             )
 
-    columns = [
-        "source",
-        "source_id",
-        "name",
-        "category",
-        "lon",
-        "lat",
-        "provenance",
-        "upstream_license",
-        "overture_providers",
-    ]
-    frame = pd.DataFrame(rows.values())
-    if frame.empty:
-        frame = pd.DataFrame(columns=columns)
+        def way(self, way) -> None:
+            self._tick()
+            if not _has_poi(way.tags):
+                return
+
+            # Closed ways are handled by area(), which also covers multipolygons.
+            if way.is_closed():
+                return
+
+            try:
+                wkb = wkbfab.create_linestring(way)
+                geometry = shapely.wkb.loads(wkb, hex=True)
+            except (RuntimeError, ValueError):
+                return
+            if geometry.is_empty:
+                return
+
+            point = geometry.interpolate(0.5, normalized=True)
+            self._add(
+                f"way/{way.id}",
+                way.tags,
+                float(point.x),
+                float(point.y),
+            )
+
+        def area(self, area) -> None:
+            self._tick()
+            if not _has_poi(area.tags):
+                return
+            try:
+                wkb = wkbfab.create_multipolygon(area)
+                geometry = shapely.wkb.loads(wkb, hex=True)
+            except (RuntimeError, ValueError):
+                return
+            if geometry.is_empty:
+                return
+
+            point = geometry.representative_point()
+            prefix = "way" if area.from_way() else "relation"
+            self._add(
+                f"{prefix}/{area.orig_id()}",
+                area.tags,
+                float(point.x),
+                float(point.y),
+            )
+
+    handler = POIHandler()
+    try:
+        handler.apply_file(
+            str(pbf_file),
+            locations=True,
+            idx=index_spec,
+        )
+    except RuntimeError as exc:
+        raise RuntimeError(f"National Geofabrik OSM extraction failed: {exc}") from exc
+
+    if not handler.rows:
+        return _empty_osm()
+
+    frame = pd.DataFrame(handler.rows.values())
     gdf = gpd.GeoDataFrame(
         frame,
         geometry=[
             Point(xy)
-            for xy in zip(frame.get("lon", []), frame.get("lat", []), strict=False)
+            for xy in zip(frame["lon"], frame["lat"], strict=False)
         ],
         crs="EPSG:4326",
     )
-    gdf.to_parquet(cache_file, index=False)
-    write_cache_identity(cache_file, bbox)
-    _emit(progress, f"OSM: complete — {len(gdf):,} POIs cached")
+    _emit(
+        progress,
+        f"OSM preparation: national scan complete — {len(gdf):,} POI candidates",
+    )
     return gdf
+
+
+def read_osm_cache(path: Path) -> gpd.GeoDataFrame:
+    if not path.exists():
+        raise FileNotFoundError(f"Prepared OSM cache is missing: {path}")
+    return gpd.read_parquet(path)
