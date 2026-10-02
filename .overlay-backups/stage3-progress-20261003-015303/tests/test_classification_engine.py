@@ -119,26 +119,3 @@ def test_semantic_conflict_flags_suspect_entity_match():
     assert out.loc[0, "psic_status"] == "REVIEW_ENTITY_MATCH"
     assert "ENTITY_MATCH_SUSPECT_DISTANCE" in out.loc[0, "psic_flags"]
     assert "ENTITY_MATCH_SUSPECT_LOW_MATCH_SCORE" in out.loc[0, "psic_flags"]
-
-
-def test_classify_frame_reports_progress_at_requested_interval():
-    frame = pd.DataFrame(
-        [
-            {
-                "poi_id": f"x-{index}",
-                "name": "Smile Dental",
-                "sources": "osm",
-                "osm_name": "Smile Dental",
-                "osm_category": "amenity=dentist",
-            }
-            for index in range(5)
-        ]
-    )
-    calls: list[tuple[int, int]] = []
-    out = _classifier().classify_frame(
-        frame,
-        progress=lambda done, total: calls.append((done, total)),
-        progress_every=2,
-    )
-    assert len(out) == 5
-    assert calls == [(0, 5), (2, 5), (4, 5), (5, 5)]

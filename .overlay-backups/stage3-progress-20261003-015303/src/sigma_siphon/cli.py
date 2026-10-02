@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from time import perf_counter
 from typing import Annotated
 
 import typer
@@ -166,12 +165,6 @@ def classify_command(
     min_margin: Annotated[
         float, typer.Option(help="Minimum lead over the second candidate for refinement")
     ] = 0.12,
-    progress_every: Annotated[
-        int, typer.Option(help="Report classification progress every N POIs")
-    ] = 500,
-    verbose: Annotated[
-        bool, typer.Option("--verbose/--quiet", help="Show classification progress")
-    ] = True,
 ) -> None:
     """Classify an existing canonical POI file to PSIC Rev. 5 without an LLM."""
     import geopandas as gpd
@@ -187,80 +180,20 @@ def classify_command(
         else source.with_name(f"{source.stem}_psic.parquet")
     )
 
-    if progress_every < 1:
-        console.print("[red]error:[/red] --progress-every must be at least 1")
-        raise typer.Exit(2)
-
     try:
-        # Validate/create the output directory before doing expensive classification work.
-        target.parent.mkdir(parents=True, exist_ok=True)
-
-        if verbose:
-            console.print(f"Input: [bold]{source}[/bold]")
-            console.print(f"Output: [bold]{target}[/bold]")
-            console.print("[cyan]→[/cyan] Reading canonical POIs...")
-        started = perf_counter()
         try:
             frame = gpd.read_parquet(source)
         except (ValueError, TypeError):
             frame = pd.read_parquet(source)
-        if verbose:
-            console.print(
-                f"[green]✓[/green] Loaded {len(frame):,} POIs in "
-                f"{perf_counter() - started:.1f}s"
-            )
-            console.print("[cyan]→[/cyan] Loading PSIC taxonomy and semantic index...")
-
-        classifier_started = perf_counter()
         classifier = PsicClassifier(
             top_n=top_n,
             min_score=min_score,
             min_margin=min_margin,
         )
-        if verbose:
-            console.print(
-                f"[green]✓[/green] Classifier ready in "
-                f"{perf_counter() - classifier_started:.1f}s"
-            )
-            console.print(
-                f"[cyan]→[/cyan] Classifying {len(frame):,} POIs "
-                f"(progress every {progress_every:,})..."
-            )
-
-        classification_started = perf_counter()
-
-        def report_progress(done: int, total: int) -> None:
-            if not verbose or done == 0:
-                return
-            elapsed = max(perf_counter() - classification_started, 1e-9)
-            rate = done / elapsed
-            remaining = max(total - done, 0)
-            eta = remaining / rate if rate > 0 else 0.0
-            percent = (100.0 * done / total) if total else 100.0
-            console.print(
-                f"  {done:,}/{total:,} ({percent:5.1f}%) | "
-                f"{rate:,.1f} POIs/s | elapsed {elapsed:.0f}s | ETA {eta:.0f}s"
-            )
-
-        classified = classifier.classify_frame(
-            frame,
-            progress=report_progress if verbose else None,
-            progress_every=progress_every,
-        )
-        if verbose:
-            console.print(
-                f"[green]✓[/green] Classification finished in "
-                f"{perf_counter() - classification_started:.1f}s"
-            )
-            console.print("[cyan]→[/cyan] Writing Parquet output...")
-        write_started = perf_counter()
+        classified = classifier.classify_frame(frame)
+        target.parent.mkdir(parents=True, exist_ok=True)
         classified.to_parquet(target, index=False)
-        if verbose:
-            console.print(
-                f"[green]✓[/green] Output written in "
-                f"{perf_counter() - write_started:.1f}s"
-            )
-    except (ValueError, FileNotFoundError, RuntimeError, OSError) as exc:
+    except (ValueError, FileNotFoundError, RuntimeError) as exc:
         console.print(f"[red]classification error:[/red] {exc}")
         raise typer.Exit(1) from exc
 

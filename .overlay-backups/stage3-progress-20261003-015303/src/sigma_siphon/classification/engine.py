@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from typing import Any
 
 import pandas as pd
@@ -471,20 +470,10 @@ class PsicClassifier:
             },
         )
 
-    def classify_frame(
-        self,
-        frame: pd.DataFrame,
-        *,
-        progress: Callable[[int, int], None] | None = None,
-        progress_every: int = 500,
-    ) -> pd.DataFrame:
+    def classify_frame(self, frame: pd.DataFrame) -> pd.DataFrame:
         result = frame.copy()
         rows: list[dict[str, object]] = []
-        total = len(result)
-        interval = max(1, int(progress_every))
-        if progress is not None:
-            progress(0, total)
-        for position, (_, row) in enumerate(result.iterrows(), start=1):
+        for _, row in result.iterrows():
             decision = self.classify_row(row)
             rows.append(
                 {
@@ -501,8 +490,6 @@ class PsicClassifier:
                     "psic_query": decision.query_text,
                 }
             )
-            if progress is not None and (position % interval == 0 or position == total):
-                progress(position, total)
         tagged = pd.DataFrame(rows, index=result.index)
         for column in tagged.columns:
             result[column] = tagged[column]
