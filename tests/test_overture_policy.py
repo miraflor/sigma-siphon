@@ -17,12 +17,24 @@ def test_meta_dataset_is_allowed_when_provider_and_license_are_null():
     assert decision.licenses == ("CDLA-Permissive-2.0",)
 
 
-def test_foursquare_dataset_gets_apache_license_fallback():
+def test_foursquare_dataset_is_rejected_even_if_license_would_be_permissive():
     decision = evaluate_overture_sources(
-        [{"dataset": "foursquare", "provider": None, "license": None}]
+        [{"dataset": "foursquare", "provider": None, "license": "Apache-2.0"}]
     )
-    assert decision.allowed
-    assert decision.licenses == ("Apache-2.0",)
+    assert not decision.allowed
+    assert "excluded by source policy" in decision.reason
+
+
+def test_mixed_lineage_is_rejected_when_any_source_is_foursquare():
+    decision = evaluate_overture_sources(
+        [
+            {"dataset": "meta", "provider": None, "license": None},
+            {"dataset": "foursquare", "provider": None, "license": None},
+        ]
+    )
+    assert not decision.allowed
+    assert "foursquare" in decision.datasets
+    assert "excluded by source policy" in decision.reason
 
 
 def test_known_provider_can_be_used_when_dataset_is_missing():

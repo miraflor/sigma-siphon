@@ -18,9 +18,10 @@ KNOWN_DATASET_LICENSES: dict[str, str] = {
     "renderseo": "CDLA-Permissive-2.0",
     "dac": "CDLA-Permissive-2.0",
     "brightquery": "CDLA-Permissive-2.0",
-    "foursquare": "Apache-2.0",
     "alltheplaces": "CC0-1.0",
 }
+
+EXCLUDED_DATASETS = {"foursquare"}
 
 ALLOWED_LICENSES = {
     "CDLA-Permissive-2.0",
@@ -189,6 +190,16 @@ def evaluate_overture_sources(value: Any) -> OvertureSourceDecision:
 
     for item in items:
         dataset, provider, explicit_license = _source_identity(item)
+
+        if dataset in EXCLUDED_DATASETS or provider in EXCLUDED_DATASETS:
+            label = dataset or provider
+            return OvertureSourceDecision(
+                allowed=False,
+                providers=tuple(sorted(providers | ({provider} if provider else set()))),
+                licenses=tuple(sorted(licenses)),
+                datasets=tuple(sorted(datasets | ({dataset} if dataset else set()))),
+                reason=f"{label} is excluded by source policy",
+            )
 
         if dataset:
             datasets.add(dataset)

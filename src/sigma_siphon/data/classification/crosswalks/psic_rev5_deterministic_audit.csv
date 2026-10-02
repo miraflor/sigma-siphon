@@ -1,0 +1,40 @@
+source,source_value,row_count,query_text,branch_codes,suggested_kind,suggested_codes,candidate_codes
+osm,shop=convenience,960,retail selling in convenience stores,4711,EXACT,47114,47114|47113|47111|47115|47112
+overture,coffee_shop,312,operation of cafes or coffee shops,563,EXACT,56302,56302|56303|56301|56304|5630
+osm,amenity=fast_food,286,fast-food restaurant operations,561,EXACT,56102,56102|5610|561|56109|56103
+overture,cafe,230,operation of cafes or coffee shops,563,EXACT,56302,56302|56303|56301|56304|5630
+osm,amenity=cafe,174,operation of cafes or coffee shops,563,EXACT,56302,56302|56303|56301|56304|5630
+overture,fast_food_restaurant,172,fast-food restaurant operations,561,EXACT,56102,56102|5610|561|56109|56103
+overture,grocery_store,148,retail selling in groceries,4711,EXACT,47111,47111|47114|47113|47112|47115
+overture,convenience_store,148,retail selling in convenience stores,4711,EXACT,47114,47114|47113|47111|47115|47112
+overture,clothing_store,124,retail sale garments clothing apparel,4771,EXACT,47711,47711|4771|47719|47712|47713
+overture,bank_or_credit_union,121,banking and credit cooperative activities,64,EXACT,64125,64125|64133|6412|64129|6495
+osm,shop=bakery,101,retail sale bakery products,47,EXACT,47214,47214|4721|47217|47761|47219
+osm,shop=supermarket,75,retail selling in supermarkets and hypermarkets,4711,EXACT,47112,47112|47111|47114|47113|47115
+overture,flowers_and_gifts_store,54,retail sale flowers and gifts,47,EXACT,47735,47735|4721|47401|47217|47761
+osm,shop=clothes,40,retail sale garments clothing apparel,4771,EXACT,47711,47711|4771|47719|47712|47713
+overture,pet_store,29,retail sale pet,47,EXACT,47761,47761|4776|47762|4721|47217
+osm,shop=department_store,21,retail sale department store,47,EXACT,47191,47191|4721|47217|47761|47219
+overture,eyewear_store,20,retail sale eyewear,47,EXACT,47736,47736|47712|4721|47217|47761
+overture,real_estate_service,387,real estate activities,68,SUBTREE,68,68|6821|68210|682|68290
+overture,lodging,303,accommodation activities,55,SUBTREE,55,55|5510|551|5520|552
+overture,pharmacy,190,retail sale pharmaceutical medical goods,4772,SUBTREE,4772,4772|47721|47723|47724|47722
+overture,shopping,145,retail trade activities,47,SUBTREE,47,47|4790|479|47900|4721
+overture,education,126,education activities,85,SUBTREE,85,85|855|8559|8520|852
+overture,hospital,122,hospital activities,861,SUBTREE,861,861|8611|8612|86129|86111
+overture,barber,67,hairdressing and barber activities,962,SUBTREE,9621,9621|96212|96211|962|9623
+osm,amenity=pharmacy,55,retail sale pharmaceutical medical goods,4772,SUBTREE,4772,4772|47721|47723|47724|47722
+osm,amenity=pharmacy | healthcare=pharmacy,49,retail sale pharmaceutical medical goods,4772,SUBTREE,4772,4772|47721|47723|47724|47722
+overture,insurance_agency,44,insurance agency,,SUBTREE,651,651|6511|65110|65201|6512
+overture,historic_site,262,historic site,,NOT_ACTIVITY,,
+osm,public_transport=platform,199,platform public transport,,NOT_ACTIVITY,,
+osm,man_made=bridge,76,bridge man made,,NOT_ACTIVITY,,
+overture,park,67,park,,NOT_ACTIVITY,,
+overture,beach,60,beach,,NOT_ACTIVITY,,
+osm,leisure=park,51,park leisure,,NOT_ACTIVITY,,
+osm,tourism=artwork,35,artwork tourism,,NOT_ACTIVITY,,
+osm,leisure=pitch,29,pitch leisure,,NOT_ACTIVITY,,
+overture,bridge,11,bridge,,NOT_ACTIVITY,,
+overture,monument,6,monument,,NOT_ACTIVITY,,
+overture,community_and_government,144,community and government,,UNCODEABLE,,
+osm,office=company,63,company professional service activities,,UNCODEABLE,,

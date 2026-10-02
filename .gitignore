@@ -23,6 +23,6 @@ output/
 /data/source/
 /data/boundaries/PHL_ADM3_simplified.geojson
 
-# Large OSM working files — defense in depth
+# Large OSM working files â€” defense in depth
 *.osm.pbf
 node-locations.cache

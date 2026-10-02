@@ -18,7 +18,7 @@ ProgressCallback = Callable[[str], None]
 
 # Bump whenever normalization/provenance policy changes in a way that makes an
 # older cached Overture layer unsafe to reuse.
-OVERTURE_NORMALIZATION_VERSION = 2
+OVERTURE_NORMALIZATION_VERSION = 3
 
 
 def _emit(progress: ProgressCallback | None, message: str) -> None:

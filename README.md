@@ -744,3 +744,19 @@ git diff --check
 ```
 
 The unit tests are network-free.
+
+## Built-in PSIC classification reference
+
+Version 0.2.2 adds the self-contained reference foundation for the upcoming PSIC-first
+classifier. Validate it with:
+
+```powershell
+sigma-siphon classification-check
+```
+
+The bundle contains the normalized PSIC Revision 5 hierarchy, its official reference workbook,
+the Revision 5-to-PSIC-2019 bridge, the PSIC-2019-to-PSA-2018-I-O concordance, and OSM/Overture
+PSIC review/crosswalk tables. Foursquare, PSCC, and PCPC rows are not included in this bundle.
+
+This is intentionally a staging release: `sigma-siphon run` still uses the existing deterministic
+IO classifier. See `CLASSIFICATION_REFERENCE.md` for the exact Stage 2 boundary.

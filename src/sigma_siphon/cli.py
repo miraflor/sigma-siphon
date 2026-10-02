@@ -9,6 +9,7 @@ from rich.table import Table
 
 from . import __version__
 from .areas import load_areas
+from .classification import ReferenceDataError, validate_builtin_classification_reference
 from .llm import LLMClassifier
 from .pipeline import run_pipeline
 from .settings import DEFAULT_GEOFABRIK_MAX_AGE_DAYS
@@ -67,6 +68,10 @@ def doctor(
     console.print(
         f"Geofabrik refresh prompt threshold: {DEFAULT_GEOFABRIK_MAX_AGE_DAYS:g} days"
     )
+    console.print(
+        "Classification reference: built-in PSIC Rev. 5 + PSA 2018 IO16/IO80/IO240 "
+        "(run classification-check to validate)"
+    )
 
     if key_present:
         console.print(
@@ -78,6 +83,60 @@ def doctor(
             "LLM: optional — no API key variable present "
             "(default rules-only mode is ready)"
         )
+
+
+@app.command("classification-check")
+def classification_check() -> None:
+    """Validate the built-in PSIC and input-output reference bundle."""
+    try:
+        report = validate_builtin_classification_reference()
+    except ReferenceDataError as exc:
+        console.print(f"[red]classification reference error:[/red] {exc}")
+        raise typer.Exit(1) from exc
+
+    table = Table(title="Built-in classification reference")
+    table.add_column("Component")
+    table.add_column("Status")
+    table.add_column("Details")
+
+    levels = ", ".join(
+        f"{level}={count:,}" for level, count in report.taxonomy_level_counts.items()
+    )
+    table.add_row(
+        "PSIC Revision 5",
+        "OK",
+        f"{report.taxonomy_nodes:,} nodes; {report.taxonomy_roots} roots; {levels}",
+    )
+    table.add_row(
+        "PSIC hierarchy",
+        "OK",
+        f"fingerprint {report.taxonomy_fingerprint}; "
+        f"{report.structural_level_gaps} non-fatal level gap(s)",
+    )
+    table.add_row(
+        "Rev5 → PSIC 2019 bridge",
+        "OK",
+        f"{report.bridge_rows:,} rows; "
+        + ", ".join(f"{k}={v:,}" for k, v in report.bridge_level_counts.items()),
+    )
+    table.add_row(
+        "PSIC 2019 → PSA 2018 I-O",
+        "OK",
+        f"{report.concordance_rows:,} rows; "
+        + ", ".join(f"{k}={v:,}" for k, v in report.concordance_level_counts.items()),
+    )
+    table.add_row(
+        "OSM/Overture crosswalk references",
+        "OK",
+        f"{len(report.crosswalk_files)} files; {report.crosswalk_rows:,} rows",
+    )
+    table.add_row(
+        "Official PSIC workbook",
+        "OK",
+        f"sha256 {report.workbook_sha256[:16]}…",
+    )
+    console.print(table)
+    console.print("[green]Classification reference bundle is internally consistent.[/green]")
 
 
 def _decide_geofabrik_refresh(

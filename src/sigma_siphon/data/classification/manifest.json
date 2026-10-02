@@ -1,0 +1,53 @@
+{
+  "assets": {
+    "crosswalks/psic_rev5.csv": {
+      "rows": 956,
+      "sha256": "1f121d52cb167d0b64d46c74e1e319539ca5fe85b1d5904e69375fe4e68c4292",
+      "size_bytes": 75869
+    },
+    "crosswalks/psic_rev5_deterministic_audit.csv": {
+      "rows": 39,
+      "sha256": "ae24a624960bbb3438e80d608cde937d7d1a67a560be62057769e60ce1c4d18d",
+      "size_bytes": 3490
+    },
+    "crosswalks/psic_rev5_suggested.csv": {
+      "rows": 956,
+      "sha256": "266806fcc289f26366f9f3ebda4ab1a715e31febd3c8e3b12b58c0e7bf8c7388",
+      "size_bytes": 434819
+    },
+    "crosswalks/psic_rev5_suggested_final.csv": {
+      "rows": 956,
+      "sha256": "a9b30c956b6b2ec34a99d97c7a3b5b75df67d6d926534b3de936b8f6bb92756e",
+      "size_bytes": 437461
+    },
+    "crosswalks/psic_rev5_suggested_semantic.csv": {
+      "rows": 956,
+      "sha256": "0ac64d5ad84998b69e7fd6ee2f50cb1e0ba190cc14baf194b4206d1d149ee910",
+      "size_bytes": 437345
+    },
+    "crosswalks/psic_rev5_top100_review.csv": {
+      "rows": 59,
+      "sha256": "5d95ef3f70cafdee236077bf2ae38effde2812fdf4a98499b39d51e0b4d5066b",
+      "size_bytes": 25892
+    },
+    "io/psic_2019_to_io_2018.csv": {
+      "rows": 354,
+      "sha256": "a390dbfd86407718399a8d6151c8b4291663e616bd52b817a88742217dd292f1",
+      "size_bytes": 194208
+    },
+    "io/psic_rev5_to_psic_2019.csv": {
+      "rows": 371,
+      "sha256": "9e3d8de27d5234d40e8e4eaec4a6e3535db31163eae3fe41cb1e02245c75bd17",
+      "size_bytes": 38104
+    },
+    "psic_rev5/PSIC_Revision_5_Detailed_Structure_30July2026.xlsx": {
+      "sha256": "9f09fd2a1763f2feccc0d13276987bbfd5825a2ee3cc358bb5ecb1afa4b93593",
+      "size_bytes": 101242
+    },
+    "psic_rev5/nodes.parquet": {
+      "sha256": "f8f6791d340d6e010423f8fc9ee9ad616c64b32a0e56a611ddd2be35b4dfca23",
+      "size_bytes": 64881
+    }
+  },
+  "schema_version": 1
+}

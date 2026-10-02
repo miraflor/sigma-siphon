@@ -65,3 +65,19 @@ Sigma Siphon carries an 80-code / 16-code mapping used as local classification m
 The code structure is treated as factual classification metadata. This repository does not package PSA spreadsheets, reports, or source workbooks.
 
 Reference page: https://psa.gov.ph/statistics/supply-and-use-input-output
+
+## Built-in PSIC classification reference
+
+The classification package now includes a reproducible PSIC Revision 5 reference bundle:
+
+- the official PSIC Revision 5 detailed-structure workbook used to construct the hierarchy;
+- a normalized PSIC Revision 5 hierarchy in Parquet form;
+- OSM/Overture PSIC crosswalk and review tables;
+- a PSIC Revision 5 to PSIC 2019 bridge; and
+- a PSIC 2019 to PSA 2018 input-output concordance for IO16, IO80, and IO240.
+
+The bundled crosswalk/reference tables contain OSM and Overture rows only. PSCC, PCPC, and
+Foursquare classification rows are intentionally outside this package.
+
+Reference page for PSIC: https://psa.gov.ph/classification/psic
+Reference page for input-output statistics: https://psa.gov.ph/statistics/supply-and-use-input-output

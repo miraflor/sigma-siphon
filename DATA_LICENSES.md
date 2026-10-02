@@ -34,9 +34,11 @@ The final GeoParquet includes:
 
 `ATTRIBUTION.txt` and `DATABASE_LICENSE.txt` are generated for each run.
 
-## Input-output metadata
+## PSIC and input-output reference material
 
-The repository uses numeric IO80/IO16 codes and independently written descriptive labels. It does not redistribute the underlying government publication or workbook. Philippine law separately excludes mere data as such from copyright protection while also containing special rules for exploitation of Philippine government works for profit. Keeping the repository to code identities and independently worded descriptors avoids relying on verbatim publication text. This engineering choice does not itself resolve whether a particular commercial product would require agency approval under Section 176.1; obtain legal or agency confirmation if the product materially republishes or exploits a Philippine government work rather than merely using factual code identities.
+The repository now packages the official PSIC Revision 5 detailed-structure workbook together with normalized PSIC hierarchy data and locally maintained PSIC-to-I-O reference tables so classification can be reproduced without downloading a taxonomy at runtime. Philippine government works and factual classification data can be subject to different legal rules depending on how they are reproduced or commercially exploited. The bundled files are included for classification reproducibility; downstream distributors should independently confirm any permissions or attribution requirements that apply to their mode of redistribution or commercial use.
+
+The I-O reference layer contains PSIC-to-IO16/IO80/IO240 code relationships and associated descriptive metadata used by the classifier. It is not a copy of the full PSA input-output transaction workbook.
 
 ## Practical release rule
 
