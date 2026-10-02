@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "sigma-siphon"
-version = "0.2.2"
+version = "0.3.0"
 description = "Acquire, reconcile, clip, and IO-tag Philippine POIs from OSM and Overture."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -14,6 +14,7 @@ authors = [{name = "James Matthew Miraflor"}]
 dependencies = [
   "geopandas>=1.0,<2",
   "openai>=1.50,<4",
+  "numpy>=1.26,<3",
   "osmium>=4.3,<5",
   "overturemaps>=1.0.2,<2",
   "pandas>=2.2,<4",
@@ -21,6 +22,7 @@ dependencies = [
   "PyYAML>=6,<7",
   "rapidfuzz>=3.9,<4",
   "requests>=2.32,<3",
+  "scikit-learn>=1.5,<2",
   "rich>=13.7,<16",
   "shapely>=2.0,<3",
   "typer>=0.12,<1",

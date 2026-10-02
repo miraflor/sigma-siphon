@@ -3,12 +3,13 @@ from __future__ import annotations
 import tomllib
 from pathlib import Path
 
-# These exact declared ranges were license-reviewed on 2026-09-30. Changing a
+# These exact declared ranges were license-reviewed on 2026-10-03. Changing a
 # package *or its accepted version range* requires an intentional re-audit.
 AUDITED_BUILD = ("hatchling>=1.25,<2",)
 AUDITED_RUNTIME = (
     "geopandas>=1.0,<2",
     "openai>=1.50,<4",
+    "numpy>=1.26,<3",
     "osmium>=4.3,<5",
     "overturemaps>=1.0.2,<2",
     "pandas>=2.2,<4",
@@ -16,6 +17,7 @@ AUDITED_RUNTIME = (
     "PyYAML>=6,<7",
     "rapidfuzz>=3.9,<4",
     "requests>=2.32,<3",
+    "scikit-learn>=1.5,<2",
     "rich>=13.7,<16",
     "shapely>=2.0,<3",
     "typer>=0.12,<1",

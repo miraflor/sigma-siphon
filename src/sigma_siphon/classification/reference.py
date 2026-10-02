@@ -101,6 +101,7 @@ class PsicTaxonomy:
 
         self._root_paths: dict[str, tuple[str, ...]] = {}
         self._leaf_cache: dict[str, frozenset[str]] = {}
+        self._branch_depth_cache: dict[str, int] = {}
         self._build_root_paths()
 
     def _build_root_paths(self) -> None:
@@ -139,6 +140,25 @@ class PsicTaxonomy:
 
     def parent(self, code: str) -> str | None:
         return self.get(code).parent_code
+
+    def has_children(self, code: str | None) -> bool:
+        return bool(self._children.get(code))
+
+    def level_of(self, code: str | None) -> str | None:
+        return self.get(code).level if code is not None else None
+
+    @property
+    def max_depth(self) -> int:
+        return max(self.depth(code) for code in self.nodes)
+
+    def branch_max_depth(self, code: str) -> int:
+        key = str(code)
+        cached = self._branch_depth_cache.get(key)
+        if cached is not None:
+            return cached
+        value = max(self.depth(leaf) for leaf in self.leaves(key))
+        self._branch_depth_cache[key] = value
+        return value
 
     def ancestors(self, code: str, *, include_self: bool = True) -> list[str]:
         path = self._root_paths[str(code)]

@@ -113,6 +113,12 @@ def _single(row: pd.Series) -> dict[str, object]:
         "sources": str(row.source),
         "osm_id": sid if row.source == "osm" else "",
         "overture_id": sid if row.source == "overture" else "",
+        "osm_name": str(row["name"]) if row.source == "osm" else "",
+        "osm_category": clean_text(row.get("category")) if row.source == "osm" else "",
+        "overture_name": str(row["name"]) if row.source == "overture" else "",
+        "overture_category": (
+            clean_text(row.get("category")) if row.source == "overture" else ""
+        ),
         "aliases": [],
         "match_distance_m": None,
         "match_name_score": None,
@@ -182,6 +188,10 @@ def reconcile(
                 "sources": "osm|overture",
                 "osm_id": str(left.source_id),
                 "overture_id": str(right.source_id),
+                "osm_name": str(left["name"]),
+                "osm_category": clean_text(left.get("category")),
+                "overture_name": str(right["name"]),
+                "overture_category": clean_text(right.get("category")),
                 "aliases": aliases,
                 "match_distance_m": round(candidate.distance_m, 3),
                 "match_name_score": round(candidate.name_score, 4),
@@ -205,7 +215,8 @@ def reconcile(
     if frame.empty:
         frame = pd.DataFrame(columns=[
             "poi_id", "name", "category", "lon", "lat", "source_count", "sources",
-            "osm_id", "overture_id", "aliases", "match_distance_m", "match_name_score",
+            "osm_id", "overture_id", "osm_name", "osm_category", "overture_name",
+            "overture_category", "aliases", "match_distance_m", "match_name_score",
             "source_licenses", "overture_providers",
         ])
     return gpd.GeoDataFrame(

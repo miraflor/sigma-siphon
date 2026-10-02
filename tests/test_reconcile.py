@@ -121,3 +121,31 @@ def test_distant_observations_stay_separate():
     out = reconcile(a, b)
     assert len(out) == 2
     assert set(out["source_count"]) == {1}
+
+
+def test_reconciliation_preserves_source_specific_semantics():
+    a = layer(
+        "osm",
+        [{
+            "source_id": "node/1",
+            "name": "Alpha Coffee",
+            "category": "amenity=cafe | cuisine=coffee_shop",
+            "lon": 121.0,
+            "lat": 14.5,
+        }],
+    )
+    b = layer(
+        "overture",
+        [{
+            "source_id": "ov-1",
+            "name": "Alpha Coffee Cafe",
+            "category": "coffee_shop",
+            "lon": 121.00005,
+            "lat": 14.5,
+        }],
+    )
+    out = reconcile(a, b)
+    assert out.loc[0, "osm_name"] == "Alpha Coffee"
+    assert out.loc[0, "osm_category"] == "amenity=cafe | cuisine=coffee_shop"
+    assert out.loc[0, "overture_name"] == "Alpha Coffee Cafe"
+    assert out.loc[0, "overture_category"] == "coffee_shop"

@@ -17,7 +17,9 @@ def _source(source: str, sid: str, name: str, category: str):
             "lon": [121.0],
             "lat": [14.5],
             "provenance": [source],
-            "upstream_license": ["ODbL-1.0" if source == "osm" else "CDLA-Permissive-2.0"],
+            "upstream_license": [
+                "ODbL-1.0" if source == "osm" else "CDLA-Permissive-2.0"
+            ],
             "overture_providers": ["" if source == "osm" else "meta"],
         }
     )
@@ -27,6 +29,7 @@ def _source(source: str, sid: str, name: str, category: str):
 def test_end_to_end_without_network(monkeypatch, tmp_path: Path):
     pbf_file = tmp_path / "philippines-latest.osm.pbf"
     pbf_file.touch()
+
     monkeypatch.setattr(
         pipeline,
         "ensure",
@@ -46,6 +49,7 @@ def test_end_to_end_without_network(monkeypatch, tmp_path: Path):
         "fetch_overture",
         lambda *args, **kwargs: _source("overture", "ov-1", "Sample Bank", "bank"),
     )
+
     written: dict[str, gpd.GeoDataFrame] = {}
 
     def fake_to_parquet(self, path, index=False):
@@ -59,13 +63,24 @@ def test_end_to_end_without_network(monkeypatch, tmp_path: Path):
         root=tmp_path,
         use_llm=False,
     )
+
     assert target.exists()
     assert (target.parent / "run.json").exists()
     assert (target.parent / "ATTRIBUTION.txt").exists()
     assert (target.parent / "DATABASE_LICENSE.txt").exists()
+
     result = written["frame"]
     assert len(result) == 1
+
+    # Stage 3 invariant: reconciliation retains source-specific semantics.
+    assert result.loc[0, "osm_name"] == "Sample Bank"
+    assert result.loc[0, "osm_category"] == "amenity=bank"
+    assert result.loc[0, "overture_name"] == "Sample Bank"
+    assert result.loc[0, "overture_category"] == "bank"
+
+    # Stage 3 deliberately leaves the production IO classifier unchanged.
     assert result.loc[0, "io80_code"] == "66"
+
     assert report["counts"]["matched_two_source"] == 1
     assert "ODbL-1.0" in result.loc[0, "source_licenses"]
     assert report["classification"]["io80_code_71_allowed"] is True

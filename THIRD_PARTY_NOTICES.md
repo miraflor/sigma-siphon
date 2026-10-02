@@ -1,6 +1,6 @@
 # Third-party software license audit
 
-Audit date: **2026-09-30**.
+Audit date: **2026-10-03**.
 
 The project intentionally depends only on software whose reviewed licenses permit commercial use. No dependency is intentionally subject to a research-only, non-commercial, or source-data-use restriction.
 
@@ -11,12 +11,14 @@ The project intentionally depends only on software whose reviewed licenses permi
 | Hatchling | build backend | MIT | Yes |
 | GeoPandas | geospatial frames/I/O | BSD-3-Clause | Yes |
 | OpenAI Python | OpenAI-compatible client | Apache-2.0 | Yes |
+| NumPy | numerical arrays for lexical retrieval | BSD-3-Clause | Yes |
 | overturemaps | Overture data client | MIT | Yes |
 | pandas | tabular processing | BSD-3-Clause | Yes |
 | PyArrow | Parquet / Arrow | Apache-2.0 | Yes |
 | PyYAML | configuration | MIT | Yes |
 | RapidFuzz | name similarity | MIT | Yes |
 | Requests | HTTP client | Apache-2.0 | Yes |
+| scikit-learn | TF-IDF lexical retrieval | BSD-3-Clause | Yes |
 | Rich | CLI rendering | MIT | Yes |
 | Shapely | geometry | BSD-3-Clause | Yes |
 | Typer | CLI | MIT | Yes |

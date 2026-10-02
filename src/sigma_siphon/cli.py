@@ -9,7 +9,11 @@ from rich.table import Table
 
 from . import __version__
 from .areas import load_areas
-from .classification import ReferenceDataError, validate_builtin_classification_reference
+from .classification import (
+    PsicClassifier,
+    ReferenceDataError,
+    validate_builtin_classification_reference,
+)
 from .llm import LLMClassifier
 from .pipeline import run_pipeline
 from .settings import DEFAULT_GEOFABRIK_MAX_AGE_DAYS
@@ -71,6 +75,10 @@ def doctor(
     console.print(
         "Classification reference: built-in PSIC Rev. 5 + PSA 2018 IO16/IO80/IO240 "
         "(run classification-check to validate)"
+    )
+    console.print(
+        "Deterministic PSIC classifier: standalone `classify` command ready; "
+        "main `run` path remains unchanged at this checkpoint"
     )
 
     if key_present:
@@ -137,6 +145,67 @@ def classification_check() -> None:
     )
     console.print(table)
     console.print("[green]Classification reference bundle is internally consistent.[/green]")
+
+
+@app.command("classify")
+def classify_command(
+    input_file: Annotated[Path, typer.Argument(help="Canonical POI Parquet to classify")],
+    output_file: Annotated[
+        Path | None,
+        typer.Option(
+            "--output",
+            "-o",
+            help="Output Parquet; default <input>_psic.parquet",
+        ),
+    ] = None,
+    top_n: Annotated[int, typer.Option(help="PSIC retrieval candidates retained per source")] = 5,
+    min_score: Annotated[
+        float, typer.Option(help="Minimum lexical score for automatic semantic refinement")
+    ] = 0.45,
+    min_margin: Annotated[
+        float, typer.Option(help="Minimum lead over the second candidate for refinement")
+    ] = 0.12,
+) -> None:
+    """Classify an existing canonical POI file to PSIC Rev. 5 without an LLM."""
+    import geopandas as gpd
+    import pandas as pd
+
+    source = input_file.resolve()
+    if not source.exists():
+        console.print(f"[red]error:[/red] input file does not exist: {source}")
+        raise typer.Exit(1)
+    target = (
+        output_file.resolve()
+        if output_file is not None
+        else source.with_name(f"{source.stem}_psic.parquet")
+    )
+
+    try:
+        try:
+            frame = gpd.read_parquet(source)
+        except (ValueError, TypeError):
+            frame = pd.read_parquet(source)
+        classifier = PsicClassifier(
+            top_n=top_n,
+            min_score=min_score,
+            min_margin=min_margin,
+        )
+        classified = classifier.classify_frame(frame)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        classified.to_parquet(target, index=False)
+    except (ValueError, FileNotFoundError, RuntimeError) as exc:
+        console.print(f"[red]classification error:[/red] {exc}")
+        raise typer.Exit(1) from exc
+
+    counts = classified["psic_status"].value_counts(dropna=False).to_dict()
+    resolved = int(classified["psic_code"].astype(str).str.strip().ne("").sum())
+    console.print(
+        f"[green]Complete[/green]: {len(classified):,} POIs; "
+        f"{resolved:,} received a deterministic PSIC code"
+    )
+    for status, count in sorted(counts.items(), key=lambda item: (-item[1], str(item[0]))):
+        console.print(f"  {status}: {int(count):,}")
+    console.print(f"Output: [bold]{target}[/bold]")
 
 
 def _decide_geofabrik_refresh(

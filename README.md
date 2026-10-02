@@ -187,7 +187,7 @@ sigma-siphon doctor
 A normal installation without OpenAI should look approximately like:
 
 ```text
-sigma-siphon 0.1.5
+sigma-siphon 0.3.0
 Areas: 1645 (1642 localities + 3 composites)
 Exact boundaries: available
 OSM endpoint: ready
@@ -254,6 +254,51 @@ It does **not** create, delete, activate, update, or reinstall any Conda
 environment.
 
 It does **not** configure OpenAI.
+
+---
+
+# Standalone PSIC classification
+
+Sigma Siphon includes a built-in PSIC Revision 5 taxonomy and a deterministic,
+hierarchy-aware classifier for existing canonical POI files. It uses OSM and
+Overture source semantics, conservative source-ontology floors, word and
+character TF-IDF retrieval, descendant refinement, and independent-source
+fusion. No LLM is used by this command.
+
+Classify an existing canonical POI Parquet file with:
+
+```powershell
+sigma-siphon classify .\output\pasig\pois.parquet
+```
+
+The default output is written beside the input as:
+
+```text
+pois_psic.parquet
+```
+
+You can choose another path:
+
+```powershell
+sigma-siphon classify .\output\pasig\pois.parquet `
+  --output .\output\pasig\pois_psic.parquet
+```
+
+The added columns include `psic_code`, `psic_level`, `psic_title`,
+`psic_status`, `psic_method`, candidate codes, evidence sources, flags, and
+retrieval diagnostics. New reconciled Sigma Siphon outputs preserve separate
+`osm_name`, `osm_category`, `overture_name`, and `overture_category` fields so
+source evidence can be fused rather than collapsed.
+
+Validate the bundled classification references at any time with:
+
+```powershell
+sigma-siphon classification-check
+```
+
+At this checkpoint the normal `sigma-siphon run` production path still uses the
+existing direct I-O tagging flow. The standalone PSIC engine is intentionally
+kept separate until its deterministic behavior is validated on real POI output.
 
 ---
 
