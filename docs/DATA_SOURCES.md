@@ -4,25 +4,17 @@ Sigma Siphon directly acquires two POI sources.
 
 ## OpenStreetMap
 
-Named establishment-relevant objects are requested through Overpass and normalized to representative points. Broad railway/aeroway selectors are intentionally avoided; only establishment-like station, halt, terminal and aerodrome values are queried for those keys.
+OpenStreetMap POIs are extracted locally from the Geofabrik Philippines PBF.
+Sigma Siphon scans each Geofabrik source version once, checkpoints preparation,
+and reuses prepared per-locality caches on later runs. Named establishment-like
+nodes, ways, and areas are normalized to representative points.
 
-The data are licensed under ODbL 1.0. Commercial use is permitted subject to the ODbL conditions.
-
-For ordinary small-team deployment, Sigma Siphon ships with this built-in Overpass endpoint:
-
-```text
-https://overpass.private.coffee/api/interpreter
-```
-
-At the time this default was reviewed (2026-10-01), the OpenStreetMap Overpass instance list stated that Private.coffee may be used for any project and had no rate limit, while asking users to notify the operator in advance for large-scale projects.
-
-A deployment maintainer may override the endpoint with `SIGMA_OSM_OVERPASS_URL` without changing source code. Ordinary users should not need to configure an endpoint.
-
-Because external service policies can change independently of this repository, maintainers should re-check the endpoint policy periodically and before materially increasing workload.
+The data are licensed under ODbL 1.0. Commercial use is permitted subject to
+the ODbL conditions.
 
 - OSM copyright and attribution: https://www.openstreetmap.org/copyright
 - ODbL 1.0: https://opendatacommons.org/licenses/odbl/1-0/
-- Overpass instances and current usage policies: https://wiki.openstreetmap.org/wiki/Overpass_API
+- Geofabrik Philippines: https://download.geofabrik.de/asia/philippines.html
 
 ## Overture Maps Places
 
@@ -35,7 +27,7 @@ The provider intentionally outside this project's source policy is filtered out 
 
 ## Administrative boundaries and PSGC
 
-Locality geometry is generated from the simplified geoBoundaries `gbOpen` Philippines ADM3 dataset and stored in `data/boundaries/areas.gpkg`. The boundary data are licensed CC BY 3.0 IGO.
+Locality geometry is generated from the simplified geoBoundaries `gbOpen` Philippines ADM3 dataset and stored once in `src/sigma_siphon/data/boundaries/areas.gpkg`. The boundary data are licensed CC BY 3.0 IGO.
 
 Locality names and 10-digit aliases come from the Philippine Statistics Authority PSGC publication current at build time. The repository's boundary builder validates that the current catalog contains 149 cities and 1,493 municipalities before writing generated files.
 

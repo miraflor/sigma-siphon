@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import shutil
 import unicodedata
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -582,7 +581,7 @@ def make_yaml_payload(boundaries: gpd.GeoDataFrame) -> dict:
             "aliases": [row.psgc_code],
             "bbox": [round(west, 7), round(south, 7), round(east, 7), round(north, 7)],
             "boundary": {
-                "gpkg": "../data/boundaries/areas.gpkg",
+                "gpkg": "boundaries/areas.gpkg",
                 "layer": "areas",
                 "field": "psgc_code",
                 "value": row.psgc_code,
@@ -607,7 +606,7 @@ def make_yaml_payload(boundaries: gpd.GeoDataFrame) -> dict:
             "members": members,
             "bbox": [round(west, 7), round(south, 7), round(east, 7), round(north, 7)],
             "boundary": {
-                "gpkg": "../data/boundaries/areas.gpkg",
+                "gpkg": "boundaries/areas.gpkg",
                 "layer": "areas",
                 "field": "psgc_code",
                 "values": members,
@@ -715,26 +714,30 @@ def main() -> None:
     if boundaries["slug"].duplicated().any():
         raise RuntimeError("Duplicate slugs in output")
 
-    out_dir = root / "data" / "boundaries"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    gpkg = out_dir / "areas.gpkg"
+    # Runtime assets have one source of truth: package data.
+    package_data = root / "src" / "sigma_siphon" / "data"
+    package_data.mkdir(parents=True, exist_ok=True)
+    package_boundary_dir = package_data / "boundaries"
+    package_boundary_dir.mkdir(parents=True, exist_ok=True)
+
+    gpkg = package_boundary_dir / "areas.gpkg"
     if gpkg.exists():
         gpkg.unlink()
     boundaries.to_file(gpkg, layer="areas", driver="GPKG")
-    pd.DataFrame(audit).to_csv(out_dir / "boundary_match_audit.csv", index=False, encoding="utf-8")
-    write_attribution(out_dir / "ATTRIBUTION.md")
 
     payload = make_yaml_payload(boundaries)
-    config = root / "config" / "areas.yml"
-    write_yaml(config, payload)
+    catalog = package_data / "areas.yml"
+    write_yaml(catalog, payload)
 
-    # Keep editable installs/tests in sync with the repository config and geometry.
-    package_data = root / "src" / "sigma_siphon" / "data"
-    package_data.mkdir(parents=True, exist_ok=True)
-    write_yaml(package_data / "areas.yml", payload)
-    package_boundary_dir = package_data / "boundaries"
-    package_boundary_dir.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(gpkg, package_boundary_dir / "areas.gpkg")
+    # Build provenance remains outside the runtime package.
+    provenance_dir = root / "data" / "boundaries"
+    provenance_dir.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(audit).to_csv(
+        provenance_dir / "boundary_match_audit.csv",
+        index=False,
+        encoding="utf-8",
+    )
+    write_attribution(provenance_dir / "ATTRIBUTION.md")
 
     print("5/5 Verifying written files...")
     check = gpd.read_file(gpkg, layer="areas")
@@ -754,8 +757,8 @@ def main() -> None:
 
     print("SUCCESS")
     print(f"  {gpkg}")
-    print(f"  {config}")
-    print(f"  {out_dir / 'boundary_match_audit.csv'}")
+    print(f"  {catalog}")
+    print(f"  {provenance_dir / 'boundary_match_audit.csv'}")
     print(f"  canonical localities: {PSGC_EXPECTED}")
     print(f"  composite areas: {len(COMPOSITES)}")
     print(f"  configured areas: {PSGC_EXPECTED + len(COMPOSITES)}")

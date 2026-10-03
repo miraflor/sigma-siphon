@@ -5,11 +5,8 @@ import io
 from dataclasses import dataclass
 from importlib import resources
 
-import geopandas as gpd
-import pandas as pd
 import yaml
 
-from .llm import LLMClassifier
 from .text import combine, fold
 
 
@@ -74,75 +71,3 @@ def deterministic_code(name: object, category: object, rules: list[Rule] | None 
         if _rule_match(text, rule):
             return rule.code, rule.reason
     return None
-
-
-def _fill_industry_columns(row: dict[str, object], industry: Industry | None) -> None:
-    if industry is None:
-        row.update(
-            io80_code="",
-            io80_label="",
-            io16_code="",
-            io16_label="",
-        )
-        return
-    row.update(
-        io80_code=industry.io80_code,
-        io80_label=industry.io80_label,
-        io16_code=industry.io16_code,
-        io16_label=industry.io16_label,
-    )
-
-
-def tag_places(
-    frame: gpd.GeoDataFrame,
-    *,
-    llm: LLMClassifier | None = None,
-) -> gpd.GeoDataFrame:
-    """Tag canonical POIs. High-precision rules fire first; the LLM handles the rest."""
-    if frame.empty:
-        out = frame.copy()
-        for column in (
-            "io80_code", "io80_label", "io16_code", "io16_label", "tag_method",
-            "tag_confidence", "tag_reason",
-        ):
-            out[column] = pd.Series(dtype="object")
-        return out
-
-    catalog = load_catalog()
-    rules = load_rules()
-    result = frame.copy()
-    records: list[dict[str, object]] = []
-    pending: list[tuple[int, str, str]] = []
-
-    for pos, (_, source) in enumerate(result.iterrows()):
-        record: dict[str, object] = {}
-        decision = deterministic_code(source.get("name"), source.get("category"), rules)
-        if decision:
-            code, reason = decision
-            industry = catalog[code]
-            _fill_industry_columns(record, industry)
-            record.update(tag_method="rule", tag_confidence=1.0, tag_reason=reason)
-        else:
-            _fill_industry_columns(record, None)
-            record.update(tag_method="unresolved", tag_confidence=None, tag_reason="")
-            pending.append((pos, str(source.get("name") or ""), str(source.get("category") or "")))
-        records.append(record)
-
-    if llm is not None and pending:
-        decisions = llm.classify(pending, catalog)
-        for pos, decision in decisions.items():
-            record = records[pos]
-            industry = catalog.get(decision.code)
-            if industry is None:
-                continue
-            _fill_industry_columns(record, industry)
-            record.update(
-                tag_method="llm",
-                tag_confidence=decision.confidence,
-                tag_reason=decision.reason,
-            )
-
-    tagged = pd.DataFrame(records, index=result.index)
-    for column in tagged.columns:
-        result[column] = tagged[column]
-    return result

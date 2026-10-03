@@ -17,7 +17,7 @@ build/
 
 # Sigma Siphon runtime/download caches
 .sigma-cache/
-output/
+/output*/
 
 # Large external/raw geodata inputs
 /data/source/

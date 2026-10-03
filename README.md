@@ -187,10 +187,10 @@ sigma-siphon doctor
 A normal installation without OpenAI should look approximately like:
 
 ```text
-sigma-siphon 0.4.0
+sigma-siphon 0.5.0
 Areas: 1645 (1642 localities + 3 composites)
 Exact boundaries: available
-OSM endpoint: ready
+OSM source: Geofabrik Philippines PBF
 LLM: optional — API key not configured (default rules-only mode is ready)
 ```
 
@@ -474,12 +474,7 @@ A normal default run:
 sigma-siphon run pasig
 ```
 
-records:
-
-```text
-llm_enabled = false
-tagged_by_llm = 0
-```
+records `classification.llm_enabled = false` in `run.json`.
 
 An explicit LLM run:
 
@@ -667,18 +662,17 @@ sigma-siphon run pasig
 For LLM use, check the OpenAI API project, key, available credits/billing, and
 model permissions.
 
-## An OSM request fails
+## Geofabrik acquisition or OSM preparation fails
 
-Sigma Siphon includes a default Overpass endpoint. Internet or provider outages
-can still occur.
+Internet/provider interruptions can affect a refresh, while local OSM
+preparation can be interrupted during a national scan. Sigma Siphon keeps
+compatible downloads and resumable preparation checkpoints under `.sigma-cache`.
 
 Retry:
 
 ```powershell
 sigma-siphon run pasig
 ```
-
-Compatible downloaded source data are cached locally.
 
 ---
 
@@ -722,17 +716,11 @@ override a conflicting PSIC-derived candidate set.
 
 Sigma Siphon uses:
 
-1. OpenStreetMap through Overpass.
+1. OpenStreetMap via the Geofabrik Philippines PBF, prepared once per source
+   version into reusable per-locality caches.
 2. Overture Maps Places through the official `overturemaps` Python package.
 
-A default Overpass endpoint is built into the application. Deployment
-maintainers can override it with:
-
-```text
-SIGMA_OSM_OVERPASS_URL
-```
-
-Ordinary users do not need to configure it.
+See `docs/DATA_SOURCES.md` for source, provenance, and refresh details.
 
 ---
 
@@ -741,7 +729,7 @@ Ordinary users do not need to configure it.
 The configured Philippine city and municipality boundaries are packaged with
 Sigma Siphon.
 
-`config/areas.yml` contains the locality catalog and configured composite areas.
+`src/sigma_siphon/data/areas.yml` is the single canonical locality catalog and composite-area definition.
 
 A locality's 10-digit PSGC is accepted as an alias.
 
@@ -785,7 +773,7 @@ and retains source-license provenance in the output.
 See:
 
 ```text
-DATA_LICENSES.md
+docs/DATA_LICENSES.md
 THIRD_PARTY_NOTICES.md
 ```
 
@@ -799,6 +787,7 @@ Maintainers can run:
 
 ```powershell
 python tools\check_dependency_policy.py
+python tools\check_repository_hygiene.py
 python -m pytest -q
 ruff check .
 python -m compileall -q src tests scripts tools
@@ -807,33 +796,16 @@ git diff --check
 
 The unit tests are network-free.
 
-## Built-in PSIC classification reference
+## Classification integrity
 
-Version 0.2.2 adds the self-contained reference foundation for the upcoming PSIC-first
-classifier. Validate it with:
+Validate the packaged PSIC/I-O references and repository hygiene with:
 
 ```powershell
 sigma-siphon classification-check
+python tools\check_repository_hygiene.py
 ```
 
-The bundle contains the normalized PSIC Revision 5 hierarchy, its official reference workbook,
-the Revision 5-to-PSIC-2019 bridge, the PSIC-2019-to-PSA-2018-I-O concordance, and OSM/Overture
-PSIC review/crosswalk tables. Foursquare, PSCC, and PCPC rows are not included in this bundle.
-
-The Stage 2 reference foundation is now used by the production hybrid classifier.
-
-
-## Stage 4: model-assisted PSIC and I-O mapping
-
-The standalone `classify` command now supports `--llm` for unresolved PSIC rows only,
-persistent model-decision caching, three-pass hierarchy consensus, and built-in
-PSIC Revision 5 -> PSIC 2019 -> PSA 2018 IO16/IO80/IO240 mapping. Use
-`--llm-max-rows 100` for a bounded live test before running model traversal on a full area.
-See `PSIC_CLASSIFICATION.md` for the decision and provenance rules.
-
-## Stage 5: PSIC-primary hybrid I-O integration
-
-Both `run` and `classify` now treat PSIC Revision 5 as canonical. PSIC-derived
-I-O candidate sets are combined conservatively with the existing direct I-O
-rules. Direct evidence can confirm, resolve within, or fill an absent PSIC I-O
-mapping, but it cannot override a conflicting PSIC-derived candidate set.
+PSIC Revision 5 is the canonical economic-activity representation. IO16, IO80,
+and IO240 are derived through the bundled concordance, with deterministic direct
+I-O evidence used only as the conservative hybrid resolver described in
+`docs/PSIC_CLASSIFICATION.md`.
