@@ -76,4 +76,6 @@ class PsicDecision:
     retrieval_score: float | None = None
     rule: str = ""
     query_text: str = ""
+    traversal_agreement: float | None = None
+    model: str = ""
     audit: dict[str, Any] = field(default_factory=dict)

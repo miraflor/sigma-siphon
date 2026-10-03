@@ -1,72 +1,109 @@
-# Deterministic PSIC classification
+# PSIC-first classification
 
-Sigma Siphon contains a self-contained deterministic PSIC Revision 5 classifier for canonical POI data. It is intentionally separate from the main acquisition pipeline at this checkpoint so classification quality can be tested independently before replacing the existing production I-O tagging path.
+Sigma Siphon contains a self-contained PSIC Revision 5 classifier for canonical POI data. The standalone `classify` command is the Stage 4 classification path; the ordinary acquisition `run` command remains unchanged until the later integration stage.
 
-## Evidence retained from acquisition
+## Evidence
 
-New reconciled records preserve source-specific semantic fields:
+Reconciled POIs preserve source-specific semantics:
 
 - `osm_name`
 - `osm_category`
 - `overture_name`
 - `overture_category`
 
-The canonical `name` and combined `category` remain for compatibility and display. The source-specific fields are the preferred classifier inputs because independent source evidence should not be flattened before fusion.
+The classifier uses those fields independently before fusion. Legacy canonical files are still accepted when their source semantics can be recovered from `sources`, `name`, and `category`.
 
-Older canonical files are still accepted. Single-source legacy rows can be reconstructed exactly from `sources`, `name`, and `category`. For older merged rows, Sigma Siphon separates OSM-like `key=value` category components from non-OSM category components when possible and marks the result with a legacy-recovery flag.
+## Decision sequence
 
-## Classification sequence
+The default path is deterministic:
 
-For each source independently:
+1. reviewed source crosswalk rules;
+2. high-precision non-activity and uncodeable rules;
+3. curated OSM/Overture PSIC branch semantics;
+4. trusted PSIC floors;
+5. word + character TF-IDF retrieval inside the permitted branch;
+6. conservative descendant refinement;
+7. independent-source fusion and sibling backoff.
 
-1. reviewed crosswalk rules are checked first;
-2. high-precision non-activity and uncodeable source categories are handled explicitly;
-3. curated OSM/Overture category semantics produce a PSIC branch restriction;
-4. selected source categories establish a conservative PSIC floor;
-5. word and character TF-IDF retrieval searches within the allowed PSIC branch;
-6. a strong, separated retrieval hit can refine below the floor;
-7. otherwise the trusted floor is retained when available;
-8. weak or ambiguous retrieval remains candidate-only.
+Resolved deterministic rows are never sent to the model.
 
-Mapped OSM and Overture evidence is then fused in PSIC taxonomy space. Compatible nested evidence refines to the more specific admissible subtree. Independent immediate-sibling disagreement backs off by one level. Wider independent disagreement remains a conflict instead of being forced to a broad common ancestor. Activity versus non-activity disagreement between independent sources is also treated as a conflict.
+When `--llm` is enabled, only unresolved deterministic statuses eligible for adjudication (`CANDIDATES_ONLY`, `UNION`, ordinary `CONFLICT`, and `UNRESOLVED`) enter hierarchical traversal. Activity-versus-non-activity conflicts and suspect entity matches remain review cases rather than being overridden by the model.
 
-## Retrieval thresholds
+The model may only select a candidate child shown by the classifier, `STOP_HERE`, or `INSUFFICIENT`. Traversal runs three differently framed passes by default and retains the deepest node supported by a majority. The cache key includes the taxonomy fingerprint, model endpoint/model identity, prompt fingerprint, evidence text, restrictions, and pass count.
 
-The defaults are:
+## Model configuration
 
-- top candidates: `5`
-- minimum score for automatic refinement: `0.45`
-- minimum score margin over the second candidate: `0.12`
+Stage 4 reuses Sigma Siphon's existing OpenAI-compatible environment variables:
 
-These can be changed for an explicit `classify` run:
+```text
+SIGMA_LLM_API_KEY
+SIGMA_LLM_BASE_URL
+SIGMA_LLM_MODEL
+```
+
+`SIGMA_LLM_BASE_URL` and `SIGMA_LLM_MODEL` are optional; their normal Sigma defaults apply. Any OpenAI-compatible endpoint can be used.
+
+A conservative test run can cap model use:
 
 ```powershell
 sigma-siphon classify .\output\pasig\pois.parquet `
-  --top-n 5 `
-  --min-score 0.45 `
-  --min-margin 0.12
+  --llm `
+  --llm-max-rows 100 `
+  --progress-every 25
 ```
 
-Changing these thresholds changes only semantic refinement. Source-policy decisions and trusted source floors remain conservative.
+Without `--llm`, Stage 4 reproduces the deterministic PSIC path and performs no model calls.
 
-## Output columns
+## PSIC to I-O mapping
 
-The classifier appends:
+Unless `--no-io` is supplied, final PSIC codes are mapped through:
 
-| Column | Meaning |
-|---|---|
-| `psic_code` | selected PSIC Revision 5 code, blank when unresolved |
-| `psic_level` | PSIC hierarchy level of the selected code |
-| `psic_title` | official bundled PSIC title |
-| `psic_status` | resolution/fusion status |
-| `psic_method` | deciding layer, such as fusion, trusted floor, or semantic refinement |
-| `psic_candidate_codes` | retained lexical/fusion candidates |
-| `psic_evidence_sources` | source systems contributing evidence |
-| `psic_flags` | review and compatibility flags |
-| `psic_retrieval_score` | strongest retained lexical retrieval score |
-| `psic_rule` | source-semantic rule(s) used |
-| `psic_query` | normalized retrieval query text |
+```text
+PSIC Revision 5
+      ↓
+PSIC 2019 bridge
+      ↓
+PSA 2018 I-O concordance
+      ↓
+IO16 / IO80 / IO240 candidate sets
+```
 
-## Deliberate limits at this checkpoint
+The deepest valid section/division/group bridge ancestor is used. Draft bridge rows remain explicitly `PROVISIONAL_*` unless an accepted coarser ancestor produces exactly the same I-O candidate sets.
 
-The deterministic engine does **not** invoke an LLM. It also does not yet replace the normal `sigma-siphon run` I-O tagging path. The next integration stage can add candidate-bounded LLM resolution for unresolved PSIC cases and then map the resulting PSIC code through the bundled I-O concordance.
+Candidate sets are never silently collapsed. Singleton sets expose a map code directly. For IO80, the bundled audited same-name resolver can additionally resolve the 55/56 and 66/67 pairs when same-run singleton evidence is globally unanimous and has at least two distinct establishments; contradictory names force abstention.
+
+## Main output fields
+
+PSIC fields include:
+
+- `psic_code`, `psic_level`, `psic_title`
+- `psic_status`, `psic_method`
+- `psic_candidate_codes`
+- `psic_evidence_sources`, `psic_flags`
+- `psic_retrieval_score`, `psic_rule`, `psic_query`
+- `psic_traversal_agreement`, `psic_model`
+- `psic_audit`
+
+I-O fields include mapping provenance plus candidate, map-code, status, name, and confidence columns for IO16, IO80, and IO240. IO80 also records resolver method/support/score fields.
+
+## Examples
+
+Deterministic PSIC + I-O:
+
+```powershell
+sigma-siphon classify .\output\pasig\pois.parquet
+```
+
+Model-assisted unresolved PSIC + I-O:
+
+```powershell
+sigma-siphon classify .\output\pasig\pois.parquet --llm
+```
+
+PSIC only:
+
+```powershell
+sigma-siphon classify .\output\pasig\pois.parquet --no-io
+```
+
+The default output remains `<input>_psic.parquet` unless `--output` is supplied.

@@ -1,6 +1,9 @@
-"""PSIC Rev. 5 reference data and deterministic classification engine."""
+"""PSIC Rev. 5 classification and PSIC-to-I-O mapping."""
 
+from .decision_cache import ClassificationDecisionCache
 from .engine import PsicClassifier, classify_psic
+from .io_mapping import IOMapping, enrich_frame_with_io, io_coverage_summary
+from .model_backend import ChatBackend, OpenAICompatibleBackend
 from .reference import (
     ClassificationReferenceReport,
     IOReferenceCatalog,
@@ -12,17 +15,26 @@ from .reference import (
     validate_builtin_classification_reference,
 )
 from .retrieval import PsicRetriever, RetrievalHit
+from .traversal import HierarchicalPsicTraverser, TraversalResult
 
 __all__ = [
+    "ChatBackend",
+    "ClassificationDecisionCache",
     "ClassificationReferenceReport",
+    "HierarchicalPsicTraverser",
+    "IOMapping",
     "IOReferenceCatalog",
+    "OpenAICompatibleBackend",
     "PsicClassifier",
     "PsicNode",
     "PsicRetriever",
     "PsicTaxonomy",
     "ReferenceDataError",
     "RetrievalHit",
+    "TraversalResult",
     "classify_psic",
+    "enrich_frame_with_io",
+    "io_coverage_summary",
     "load_builtin_io_reference",
     "load_builtin_psic_taxonomy",
     "validate_builtin_classification_reference",

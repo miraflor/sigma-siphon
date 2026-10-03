@@ -187,7 +187,7 @@ sigma-siphon doctor
 A normal installation without OpenAI should look approximately like:
 
 ```text
-sigma-siphon 0.3.0
+sigma-siphon 0.4.0
 Areas: 1645 (1642 localities + 3 composites)
 Exact boundaries: available
 OSM endpoint: ready
@@ -259,11 +259,14 @@ It does **not** configure OpenAI.
 
 # Standalone PSIC classification
 
-Sigma Siphon includes a built-in PSIC Revision 5 taxonomy and a deterministic,
+Sigma Siphon includes a built-in PSIC Revision 5 taxonomy and a PSIC-first,
 hierarchy-aware classifier for existing canonical POI files. It uses OSM and
 Overture source semantics, conservative source-ontology floors, word and
 character TF-IDF retrieval, descendant refinement, and independent-source
-fusion. No LLM is used by this command.
+fusion. Deterministic classification remains the default; `--llm` adds
+candidate-bounded hierarchical traversal only for unresolved rows. Final PSIC
+codes are mapped to the bundled PSA 2018 IO16/IO80/IO240 concordance unless
+`--no-io` is supplied.
 
 Classify an existing canonical POI Parquet file with:
 
@@ -284,11 +287,19 @@ sigma-siphon classify .\output\pasig\pois.parquet `
   --output .\output\pasig\pois_psic.parquet
 ```
 
-The added columns include `psic_code`, `psic_level`, `psic_title`,
-`psic_status`, `psic_method`, candidate codes, evidence sources, flags, and
-retrieval diagnostics. New reconciled Sigma Siphon outputs preserve separate
-`osm_name`, `osm_category`, `overture_name`, and `overture_category` fields so
-source evidence can be fused rather than collapsed.
+The added columns include PSIC decision/provenance fields and, by default,
+PSIC-to-I-O mapping fields for IO16, IO80, and IO240. New reconciled Sigma
+Siphon outputs preserve separate `osm_name`, `osm_category`, `overture_name`,
+and `overture_category` fields so source evidence can be fused rather than
+collapsed.
+
+For a bounded model-assisted test:
+
+```powershell
+sigma-siphon classify .\output\pasig\pois.parquet `
+  --llm `
+  --llm-max-rows 100
+```
 
 Validate the bundled classification references at any time with:
 
@@ -297,8 +308,8 @@ sigma-siphon classification-check
 ```
 
 At this checkpoint the normal `sigma-siphon run` production path still uses the
-existing direct I-O tagging flow. The standalone PSIC engine is intentionally
-kept separate until its deterministic behavior is validated on real POI output.
+existing direct I-O tagging flow. The standalone PSIC-first path remains
+separate until the final integration stage.
 
 ---
 
@@ -805,3 +816,12 @@ PSIC review/crosswalk tables. Foursquare, PSCC, and PCPC rows are not included i
 
 This is intentionally a staging release: `sigma-siphon run` still uses the existing deterministic
 IO classifier. See `CLASSIFICATION_REFERENCE.md` for the exact Stage 2 boundary.
+
+
+## Stage 4: model-assisted PSIC and I-O mapping
+
+The standalone `classify` command now supports `--llm` for unresolved PSIC rows only,
+persistent model-decision caching, three-pass hierarchy consensus, and built-in
+PSIC Revision 5 -> PSIC 2019 -> PSA 2018 IO16/IO80/IO240 mapping. Use
+`--llm-max-rows 100` for a bounded live test before running model traversal on a full area.
+See `PSIC_CLASSIFICATION.md` for the decision and provenance rules.

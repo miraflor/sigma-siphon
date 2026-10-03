@@ -78,7 +78,8 @@ def doctor(
         "(run classification-check to validate)"
     )
     console.print(
-        "Deterministic PSIC classifier: standalone `classify` command ready; "
+        "PSIC-first classifier: standalone `classify` supports deterministic mode, "
+        "optional hierarchical model fallback, and built-in I-O mapping; "
         "main `run` path remains unchanged at this checkpoint"
     )
 
@@ -166,6 +167,36 @@ def classify_command(
     min_margin: Annotated[
         float, typer.Option(help="Minimum lead over the second candidate for refinement")
     ] = 0.12,
+    llm: Annotated[
+        bool,
+        typer.Option(
+            "--llm/--no-llm",
+            help="Use hierarchical model traversal only for unresolved deterministic rows",
+        ),
+    ] = False,
+    llm_passes: Annotated[
+        int, typer.Option(help="Independent hierarchy traversals per model-assisted row")
+    ] = 3,
+    llm_temperature: Annotated[
+        float, typer.Option(help="Sampling temperature for hierarchical traversal")
+    ] = 0.15,
+    llm_cache: Annotated[
+        Path,
+        typer.Option(help="Persistent SQLite cache for model-assisted PSIC decisions"),
+    ] = Path(".sigma-cache/psic_llm.sqlite"),
+    llm_max_rows: Annotated[
+        int | None,
+        typer.Option(
+            help="Maximum unresolved rows sent to the model; omit for no limit"
+        ),
+    ] = None,
+    with_io: Annotated[
+        bool,
+        typer.Option(
+            "--io/--no-io",
+            help="Map final PSIC codes to PSA 2018 IO16/IO80/IO240 candidate sets",
+        ),
+    ] = True,
     progress_every: Annotated[
         int, typer.Option(help="Report classification progress every N POIs")
     ] = 500,
@@ -173,9 +204,18 @@ def classify_command(
         bool, typer.Option("--verbose/--quiet", help="Show classification progress")
     ] = True,
 ) -> None:
-    """Classify an existing canonical POI file to PSIC Rev. 5 without an LLM."""
+    """Classify canonical POIs to PSIC Rev. 5 and optionally map them to I-O sectors."""
     import geopandas as gpd
     import pandas as pd
+
+    from .classification import (
+        ClassificationDecisionCache,
+        HierarchicalPsicTraverser,
+        OpenAICompatibleBackend,
+        enrich_frame_with_io,
+        io_coverage_summary,
+        load_builtin_psic_taxonomy,
+    )
 
     source = input_file.resolve()
     if not source.exists():
@@ -190,9 +230,19 @@ def classify_command(
     if progress_every < 1:
         console.print("[red]error:[/red] --progress-every must be at least 1")
         raise typer.Exit(2)
+    if llm_passes < 1:
+        console.print("[red]error:[/red] --llm-passes must be at least 1")
+        raise typer.Exit(2)
+    if llm_temperature < 0:
+        console.print("[red]error:[/red] --llm-temperature cannot be negative")
+        raise typer.Exit(2)
+    if llm_max_rows is not None and llm_max_rows < 1:
+        console.print("[red]error:[/red] --llm-max-rows must be at least 1")
+        raise typer.Exit(2)
 
+    decision_cache = None
     try:
-        # Validate/create the output directory before doing expensive classification work.
+        # Fail before expensive work if the output destination is malformed/unwritable.
         target.parent.mkdir(parents=True, exist_ok=True)
 
         if verbose:
@@ -212,16 +262,37 @@ def classify_command(
             console.print("[cyan]→[/cyan] Loading PSIC taxonomy and semantic index...")
 
         classifier_started = perf_counter()
+        taxonomy = load_builtin_psic_taxonomy()
+        traverser = None
+        if llm:
+            backend = OpenAICompatibleBackend.from_environment()
+            decision_cache = ClassificationDecisionCache(llm_cache.resolve())
+            traverser = HierarchicalPsicTraverser(
+                taxonomy,
+                backend,
+                passes=llm_passes,
+                temperature=llm_temperature,
+            )
+
         classifier = PsicClassifier(
+            taxonomy=taxonomy,
             top_n=top_n,
             min_score=min_score,
             min_margin=min_margin,
+            traverser=traverser,
+            decision_cache=decision_cache,
         )
         if verbose:
+            mode = "deterministic + hierarchical model fallback" if llm else "deterministic"
             console.print(
                 f"[green]✓[/green] Classifier ready in "
-                f"{perf_counter() - classifier_started:.1f}s"
+                f"{perf_counter() - classifier_started:.1f}s ({mode})"
             )
+            if llm and llm_max_rows is not None:
+                console.print(
+                    f"[yellow]Model test limit:[/yellow] at most {llm_max_rows:,} "
+                    "unresolved rows will be sent to the model"
+                )
             console.print(
                 f"[cyan]→[/cyan] Classifying {len(frame):,} POIs "
                 f"(progress every {progress_every:,})..."
@@ -246,12 +317,34 @@ def classify_command(
             frame,
             progress=report_progress if verbose else None,
             progress_every=progress_every,
+            llm_max_rows=llm_max_rows,
         )
+        if decision_cache is not None:
+            decision_cache.flush()
+
         if verbose:
             console.print(
-                f"[green]✓[/green] Classification finished in "
+                f"[green]✓[/green] PSIC classification finished in "
                 f"{perf_counter() - classification_started:.1f}s"
             )
+
+        coverage = None
+        if with_io:
+            if verbose:
+                console.print(
+                    "[cyan]→[/cyan] Mapping PSIC codes through PSIC 2019 to "
+                    "PSA 2018 IO16/IO80/IO240..."
+                )
+            io_started = perf_counter()
+            classified = enrich_frame_with_io(classified, taxonomy=taxonomy)
+            coverage = io_coverage_summary(classified)
+            if verbose:
+                console.print(
+                    f"[green]✓[/green] I-O mapping finished in "
+                    f"{perf_counter() - io_started:.1f}s"
+                )
+
+        if verbose:
             console.print("[cyan]→[/cyan] Writing Parquet output...")
         write_started = perf_counter()
         classified.to_parquet(target, index=False)
@@ -263,17 +356,33 @@ def classify_command(
     except (ValueError, FileNotFoundError, RuntimeError, OSError) as exc:
         console.print(f"[red]classification error:[/red] {exc}")
         raise typer.Exit(1) from exc
+    finally:
+        if decision_cache is not None:
+            decision_cache.close()
 
     counts = classified["psic_status"].value_counts(dropna=False).to_dict()
-    resolved = int(classified["psic_code"].astype(str).str.strip().ne("").sum())
+    coded = classified["psic_code"].astype("string").fillna("").str.strip().ne("")
+    model_coded = coded & classified["psic_method"].eq("llm")
+    deterministic_coded = coded & ~model_coded
     console.print(
         f"[green]Complete[/green]: {len(classified):,} POIs; "
-        f"{resolved:,} received a deterministic PSIC code"
+        f"{int(coded.sum()):,} received a PSIC code"
     )
+    console.print(f"  deterministic codes: {int(deterministic_coded.sum()):,}")
+    if llm:
+        console.print(f"  model-assisted codes: {int(model_coded.sum()):,}")
+    console.print(f"  without PSIC code: {int((~coded).sum()):,}")
     for status, count in sorted(counts.items(), key=lambda item: (-item[1], str(item[0]))):
         console.print(f"  {status}: {int(count):,}")
-    console.print(f"Output: [bold]{target}[/bold]")
 
+    if coverage is not None:
+        for resolution in ("io16", "io80", "io240"):
+            metrics = coverage["resolutions"][resolution]
+            console.print(
+                f"  {resolution.upper()} map-ready: {metrics['map_ready_rows']:,} / "
+                f"{len(classified):,}"
+            )
+    console.print(f"Output: [bold]{target}[/bold]")
 
 def _decide_geofabrik_refresh(
     *,

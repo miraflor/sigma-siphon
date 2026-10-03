@@ -283,8 +283,14 @@ class IOConcordanceRow:
     psic_code: str
     psic_name: str
     io16_codes: tuple[str, ...]
+    io16_names: tuple[str, ...]
+    io16_confidence: str
     io80_codes: tuple[str, ...]
+    io80_names: tuple[str, ...]
+    io80_confidence: str
     io240_codes: tuple[str, ...]
+    io240_names: tuple[str, ...]
+    io240_confidence: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -544,7 +550,9 @@ def load_builtin_io_reference() -> IOReferenceCatalog:
         if not record["psic_name"]:
             raise ReferenceDataError(f"{where}: blank PSIC name")
 
-        parsed: dict[str, tuple[str, ...]] = {}
+        parsed_codes: dict[str, tuple[str, ...]] = {}
+        parsed_names: dict[str, tuple[str, ...]] = {}
+        parsed_confidence: dict[str, str] = {}
         for resolution in IO_RESOLUTIONS:
             codes = _split_semicolon(record[f"{resolution}_codes"])
             names = tuple(
@@ -552,7 +560,9 @@ def load_builtin_io_reference() -> IOReferenceCatalog:
                 for part in str(record[f"{resolution}_names"] or "").split("|")
                 if part.strip()
             )
-            malformed = [value for value in codes if not _IO_CODE_RE[resolution].fullmatch(value)]
+            malformed = [
+                value for value in codes if not _IO_CODE_RE[resolution].fullmatch(value)
+            ]
             if malformed:
                 raise ReferenceDataError(f"{where}: malformed {resolution} codes {malformed}")
             if codes and len(codes) != len(names):
@@ -564,16 +574,24 @@ def load_builtin_io_reference() -> IOReferenceCatalog:
                 raise ReferenceDataError(
                     f"{where}: unknown {resolution} confidence {confidence!r}"
                 )
-            parsed[resolution] = codes
+            parsed_codes[resolution] = codes
+            parsed_names[resolution] = names
+            parsed_confidence[resolution] = confidence if codes else "Not mapped"
 
         concordance.append(
             IOConcordanceRow(
                 psic_level=level,
                 psic_code=code,
                 psic_name=record["psic_name"],
-                io16_codes=parsed["io16"],
-                io80_codes=parsed["io80"],
-                io240_codes=parsed["io240"],
+                io16_codes=parsed_codes["io16"],
+                io16_names=parsed_names["io16"],
+                io16_confidence=parsed_confidence["io16"],
+                io80_codes=parsed_codes["io80"],
+                io80_names=parsed_names["io80"],
+                io80_confidence=parsed_confidence["io80"],
+                io240_codes=parsed_codes["io240"],
+                io240_names=parsed_names["io240"],
+                io240_confidence=parsed_confidence["io240"],
             )
         )
 
