@@ -32,13 +32,13 @@
     },
     "io/psic_2019_to_io_2018.csv": {
       "rows": 354,
-      "sha256": "a390dbfd86407718399a8d6151c8b4291663e616bd52b817a88742217dd292f1",
-      "size_bytes": 194208
+      "sha256": "b0e69f5b5db613e5989b1e0c4e66ae2559db25b05a8aa82dc7a6a9d372abd07b",
+      "size_bytes": 193853
     },
     "io/psic_rev5_to_psic_2019.csv": {
       "rows": 371,
-      "sha256": "9e3d8de27d5234d40e8e4eaec4a6e3535db31163eae3fe41cb1e02245c75bd17",
-      "size_bytes": 38104
+      "sha256": "695e1a69d88286a50db15d818d92b4624704230c638d0eea756d9329d1800abb",
+      "size_bytes": 37732
     },
     "psic_rev5/PSIC_Revision_5_Detailed_Structure_30July2026.xlsx": {
       "sha256": "9f09fd2a1763f2feccc0d13276987bbfd5825a2ee3cc358bb5ecb1afa4b93593",

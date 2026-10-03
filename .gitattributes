@@ -1,0 +1,3 @@
+src/sigma_siphon/data/classification/crosswalks/*.csv text eol=lf
+src/sigma_siphon/data/classification/io/*.csv text eol=lf
+src/sigma_siphon/data/classification/manifest.json text eol=lf
