@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from time import perf_counter
 from typing import Annotated
@@ -15,7 +16,6 @@ from .classification import (
     ReferenceDataError,
     validate_builtin_classification_reference,
 )
-from .llm import LLMClassifier
 from .pipeline import run_pipeline
 from .settings import DEFAULT_GEOFABRIK_MAX_AGE_DAYS
 from .sources.geofabrik import cache_status
@@ -60,7 +60,7 @@ def doctor(
     areas_file: Annotated[Path | None, typer.Option(help="Alternate areas YAML")] = None,
 ) -> None:
     areas = load_areas(areas_file)
-    key_present = LLMClassifier.is_configured()
+    key_present = bool(os.getenv("SIGMA_LLM_API_KEY", "").strip())
 
     console.print(f"sigma-siphon {__version__}")
     localities = sum(area.kind in {"city", "municipality"} for area in areas.values())
@@ -78,9 +78,8 @@ def doctor(
         "(run classification-check to validate)"
     )
     console.print(
-        "PSIC-first classifier: standalone `classify` supports deterministic mode, "
-        "optional hierarchical model fallback, and built-in I-O mapping; "
-        "main `run` path remains unchanged at this checkpoint"
+        "Classification: PSIC Rev. 5 is canonical; both `classify` and `run` use "
+        "PSIC-to-I-O mapping plus a conservative direct I-O resolver"
     )
 
     if key_present:
@@ -194,7 +193,7 @@ def classify_command(
         bool,
         typer.Option(
             "--io/--no-io",
-            help="Map final PSIC codes to PSA 2018 IO16/IO80/IO240 candidate sets",
+            help="Map PSIC to IO16/IO80/IO240 and apply the direct-I/O hybrid resolver",
         ),
     ] = True,
     progress_every: Annotated[
@@ -204,7 +203,7 @@ def classify_command(
         bool, typer.Option("--verbose/--quiet", help="Show classification progress")
     ] = True,
 ) -> None:
-    """Classify canonical POIs to PSIC Rev. 5 and optionally map them to I-O sectors."""
+    """Classify to PSIC Rev. 5 and optionally derive hybrid I-O codes."""
     import geopandas as gpd
     import pandas as pd
 
@@ -212,8 +211,9 @@ def classify_command(
         ClassificationDecisionCache,
         HierarchicalPsicTraverser,
         OpenAICompatibleBackend,
+        apply_hybrid_io,
         enrich_frame_with_io,
-        io_coverage_summary,
+        hybrid_io_coverage_summary,
         load_builtin_psic_taxonomy,
     )
 
@@ -332,15 +332,16 @@ def classify_command(
         if with_io:
             if verbose:
                 console.print(
-                    "[cyan]→[/cyan] Mapping PSIC codes through PSIC 2019 to "
-                    "PSA 2018 IO16/IO80/IO240..."
+                    "[cyan]→[/cyan] Mapping PSIC to I-O and applying the "
+                    "direct-I/O hybrid resolver..."
                 )
             io_started = perf_counter()
             classified = enrich_frame_with_io(classified, taxonomy=taxonomy)
-            coverage = io_coverage_summary(classified)
+            classified = apply_hybrid_io(classified)
+            coverage = hybrid_io_coverage_summary(classified)
             if verbose:
                 console.print(
-                    f"[green]✓[/green] I-O mapping finished in "
+                    f"[green]✓[/green] Hybrid I-O resolution finished in "
                     f"{perf_counter() - io_started:.1f}s"
                 )
 
@@ -379,7 +380,7 @@ def classify_command(
         for resolution in ("io16", "io80", "io240"):
             metrics = coverage["resolutions"][resolution]
             console.print(
-                f"  {resolution.upper()} map-ready: {metrics['map_ready_rows']:,} / "
+                f"  {resolution.upper()} final-coded: {metrics['coded_rows']:,} / "
                 f"{len(classified):,}"
             )
     console.print(f"Output: [bold]{target}[/bold]")
@@ -462,7 +463,7 @@ def run_command(
         bool,
         typer.Option(
             "--llm/--no-llm",
-            help="Optionally use the LLM for rows not handled by deterministic rules",
+            help="Use hierarchical model fallback only for unresolved deterministic PSIC rows",
         ),
     ] = False,
 ) -> None:
@@ -496,7 +497,8 @@ def run_command(
     counts = report["counts"]
     console.print(
         f"[green]Complete[/green]: {counts['canonical']:,} POIs, "
-        f"{counts['tagged']:,} tagged, {counts['unresolved']:,} unresolved"
+        f"{counts['psic_coded']:,} PSIC-coded, "
+        f"{counts['io80_coded']:,} IO80-coded"
     )
     console.print(f"Output: [bold]{target}[/bold]")
 

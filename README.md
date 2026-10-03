@@ -2,8 +2,8 @@
 
 Sigma Siphon acquires Philippine points of interest from OpenStreetMap and
 Overture Maps, clips them to an exact configured city or municipality boundary,
-reconciles likely duplicates, classifies them to the 2018 Philippine
-input-output industries, and writes the result as GeoParquet.
+reconciles likely duplicates, classifies economic activity to PSIC Revision 5,
+derives hybrid Philippine I-O codes, and writes the result as GeoParquet.
 
 The default command is deliberately simple:
 
@@ -307,9 +307,8 @@ Validate the bundled classification references at any time with:
 sigma-siphon classification-check
 ```
 
-At this checkpoint the normal `sigma-siphon run` production path still uses the
-existing direct I-O tagging flow. The standalone PSIC-first path remains
-separate until the final integration stage.
+The normal `sigma-siphon run` path now uses the same PSIC-primary hybrid
+classification architecture as the standalone `classify` command.
 
 ---
 
@@ -330,9 +329,11 @@ exact boundary clipping
       ↓
 reconciliation
       ↓
-deterministic IO80 rules
+deterministic PSIC Revision 5 classification
       ↓
-deterministic IO16 derivation
+PSIC→I-O candidate mapping
+      ↓
+conservative direct-I/O resolver
       ↓
 output
 ```
@@ -348,8 +349,8 @@ unresolved.
 
 You can install and use Sigma Siphon indefinitely without configuring OpenAI.
 
-Only configure OpenAI if you decide that you want LLM classification for POIs
-that remain unresolved after the deterministic rules.
+Only configure OpenAI if you want hierarchical model traversal for POIs that
+remain unresolved after deterministic PSIC classification.
 
 The LLM is explicitly enabled with:
 
@@ -366,13 +367,15 @@ exact boundary clipping
       ↓
 reconciliation
       ↓
-deterministic IO80 rules
+deterministic PSIC Revision 5 classification
       ↓
-unresolved POIs only
+unresolved PSIC rows only
       ↓
-OpenAI LLM
+hierarchical model traversal
       ↓
-deterministic IO16 derivation
+PSIC→I-O candidate mapping
+      ↓
+conservative direct-I/O resolver
       ↓
 output
 ```
@@ -493,15 +496,18 @@ output\<area>\run.json
 The classification section includes:
 
 ```text
+architecture
+psic_canonical
 llm_enabled
 llm_model
 llm_base_url
-tagged_by_rule
-tagged_by_llm
-unresolved
+psic_status_counts
+psic_method_counts
+direct_io_status_counts
+io16 / io80 / io240 coverage and provenance
 ```
 
-The terminal summary also reports rule-versus-LLM tagging counts.
+The terminal summary reports PSIC and final I-O coverage.
 
 ---
 
@@ -691,24 +697,24 @@ output\<area>\DATABASE_LICENSE.txt
 source/provenance information, geometry, and:
 
 ```text
-io80_code
-io80_label
-io16_code
-io16_label
-tag_method
-tag_confidence
-tag_reason
+psic_code
+psic_level
+psic_title
+psic_status
+psic_method
+direct_io80_code
+direct_io16_code
+direct_io_status
+io16_code / io16_status / io16_source
+io80_code / io80_status / io80_source
+io240_code / io240_status / io240_source
 ```
 
-`tag_method` can be:
-
-```text
-rule
-llm
-unresolved
-```
-
-IO80 is the primary classification. IO16 is derived deterministically from IO80.
+PSIC is the canonical economic-activity classification. Direct I-O rules are
+independent downstream evidence: they may confirm a PSIC-derived code, resolve a
+PSIC-derived ambiguous I-O set only when the direct result lies inside that set,
+or provide a fallback when no PSIC-derived I-O candidate set exists. They never
+override a conflicting PSIC-derived candidate set.
 
 ---
 
@@ -814,8 +820,7 @@ The bundle contains the normalized PSIC Revision 5 hierarchy, its official refer
 the Revision 5-to-PSIC-2019 bridge, the PSIC-2019-to-PSA-2018-I-O concordance, and OSM/Overture
 PSIC review/crosswalk tables. Foursquare, PSCC, and PCPC rows are not included in this bundle.
 
-This is intentionally a staging release: `sigma-siphon run` still uses the existing deterministic
-IO classifier. See `CLASSIFICATION_REFERENCE.md` for the exact Stage 2 boundary.
+The Stage 2 reference foundation is now used by the production hybrid classifier.
 
 
 ## Stage 4: model-assisted PSIC and I-O mapping
@@ -825,3 +830,10 @@ persistent model-decision caching, three-pass hierarchy consensus, and built-in
 PSIC Revision 5 -> PSIC 2019 -> PSA 2018 IO16/IO80/IO240 mapping. Use
 `--llm-max-rows 100` for a bounded live test before running model traversal on a full area.
 See `PSIC_CLASSIFICATION.md` for the decision and provenance rules.
+
+## Stage 5: PSIC-primary hybrid I-O integration
+
+Both `run` and `classify` now treat PSIC Revision 5 as canonical. PSIC-derived
+I-O candidate sets are combined conservatively with the existing direct I-O
+rules. Direct evidence can confirm, resolve within, or fill an absent PSIC I-O
+mapping, but it cannot override a conflicting PSIC-derived candidate set.

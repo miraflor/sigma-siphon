@@ -1,6 +1,6 @@
 # PSIC-first classification
 
-Sigma Siphon contains a self-contained PSIC Revision 5 classifier for canonical POI data. The standalone `classify` command is the Stage 4 classification path; the ordinary acquisition `run` command remains unchanged until the later integration stage.
+Sigma Siphon contains a self-contained PSIC Revision 5 classifier for canonical POI data. PSIC is the canonical economic-activity representation used by both the standalone `classify` command and the production `run` pipeline.
 
 ## Evidence
 
@@ -71,6 +71,10 @@ IO16 / IO80 / IO240 candidate sets
 The deepest valid section/division/group bridge ancestor is used. Draft bridge rows remain explicitly `PROVISIONAL_*` unless an accepted coarser ancestor produces exactly the same I-O candidate sets.
 
 Candidate sets are never silently collapsed. Singleton sets expose a map code directly. For IO80, the bundled audited same-name resolver can additionally resolve the 55/56 and 66/67 pairs when same-run singleton evidence is globally unanimous and has at least two distinct establishments; contradictory names force abstention.
+
+## Hybrid I-O resolution
+
+After PSIC-to-I-O mapping, the deterministic direct I-O rules run as an independent downstream expert. A direct code may confirm a PSIC-derived singleton, resolve an ambiguous PSIC-derived set only when it lies inside that set, or provide a fallback when no PSIC-derived I-O candidate set exists. Direct evidence never overrides a conflicting PSIC-derived candidate set. PSIC non-activity, uncodeable, suspect-entity, and activity/non-activity-conflict decisions block direct fallback. IO240 remains PSIC-derived because the direct expert targets IO80 and its IO16 roll-up.
 
 ## Main output fields
 

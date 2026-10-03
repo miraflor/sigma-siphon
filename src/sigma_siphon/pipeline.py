@@ -10,8 +10,16 @@ from pathlib import Path
 from . import __version__
 from .areas import Area, resolve_area
 from .boundary import boundary_identity, clip_points, load_boundary
-from .industry import tag_places
-from .llm import LLMClassifier
+from .classification import (
+    ClassificationDecisionCache,
+    HierarchicalPsicTraverser,
+    OpenAICompatibleBackend,
+    PsicClassifier,
+    apply_hybrid_io,
+    enrich_frame_with_io,
+    hybrid_io_coverage_summary,
+    load_builtin_psic_taxonomy,
+)
 from .reconcile import reconcile
 from .sources import ensure, fetch_overture, load_prepared_area_osm
 
@@ -111,12 +119,9 @@ def run_pipeline(
     cache_root.mkdir(parents=True, exist_ok=True)
     out_root.mkdir(parents=True, exist_ok=True)
 
-    if use_llm and not LLMClassifier.is_configured():
-        raise RuntimeError(
-            "LLM classification is enabled, but SIGMA_LLM_API_KEY is not installed. "
-            "Run setup-llm.ps1 from the repository to add an OpenAI API key, then open "
-            "a new PowerShell window. Otherwise run the normal command without --llm."
-        )
+    # Fail before any network acquisition when model assistance was explicitly
+    # requested but its environment is not configured.
+    backend = OpenAICompatibleBackend.from_environment() if use_llm else None
 
     _say(progress, "[1/8] Preparing Geofabrik Philippines OSM extract")
     pbf_file = ensure(
@@ -182,25 +187,68 @@ def run_pipeline(
                 "canonical output contains coordinates outside the configured boundary"
             )
 
-    mode = "rules + LLM fallback" if use_llm else "deterministic rules only"
+    mode = (
+        "PSIC + direct-I/O hybrid + hierarchical model fallback"
+        if use_llm
+        else "deterministic PSIC + direct-I/O hybrid"
+    )
     _say(progress, f"[7/8] Classifying POIs — {mode}")
-    classifier = LLMClassifier.from_environment(cache_root / "llm.sqlite") if use_llm else None
-    try:
-        tagged = tag_places(canonical, llm=classifier)
-    finally:
-        if classifier is not None:
-            classifier.close()
 
-    unresolved = int((tagged["io80_code"].fillna("") == "").sum()) if len(tagged) else 0
+    taxonomy = load_builtin_psic_taxonomy()
+    decision_cache = None
+    traverser = None
+    if backend is not None:
+        decision_cache = ClassificationDecisionCache(cache_root / "psic_llm.sqlite")
+        traverser = HierarchicalPsicTraverser(taxonomy, backend)
+
+    classifier = PsicClassifier(
+        taxonomy=taxonomy,
+        traverser=traverser,
+        decision_cache=decision_cache,
+    )
+
+    def classification_progress(done: int, total: int) -> None:
+        if done and (done % 500 == 0 or done == total):
+            _say(progress, f"PSIC classification {done:,}/{total:,}")
+
+    try:
+        tagged = classifier.classify_frame(
+            canonical,
+            progress=classification_progress if progress is not None else None,
+            progress_every=500,
+        )
+        if decision_cache is not None:
+            decision_cache.flush()
+        tagged = enrich_frame_with_io(tagged, taxonomy=taxonomy)
+        tagged = apply_hybrid_io(tagged)
+    finally:
+        if decision_cache is not None:
+            decision_cache.close()
+
+    psic_coded = (
+        int(tagged["psic_code"].astype("string").fillna("").str.strip().ne("").sum())
+        if len(tagged)
+        else 0
+    )
     method_counts = (
-        tagged["tag_method"].fillna("").value_counts().to_dict()
+        tagged["psic_method"].fillna("").value_counts().to_dict()
         if len(tagged)
         else {}
     )
+    status_counts = (
+        tagged["psic_status"].fillna("").value_counts().to_dict()
+        if len(tagged)
+        else {}
+    )
+    io_coverage = hybrid_io_coverage_summary(tagged)
+    io16_coded = int(io_coverage["resolutions"]["io16"]["coded_rows"])
+    io80_coded = int(io_coverage["resolutions"]["io80"]["coded_rows"])
+    io240_coded = int(io_coverage["resolutions"]["io240"]["coded_rows"])
+    unresolved = len(tagged) - io80_coded
     _say(
         progress,
-        f"Classification complete — {int(method_counts.get('rule', 0)):,} rules, "
-        f"{int(method_counts.get('llm', 0)):,} LLM, {unresolved:,} unresolved",
+        f"Classification complete — PSIC {psic_coded:,}/{len(tagged):,}, "
+        f"IO16 {io16_coded:,}, IO80 {io80_coded:,}, IO240 {io240_coded:,}",
     )
 
     _say(progress, "[8/8] Writing output files")
@@ -234,20 +282,27 @@ def run_pipeline(
             "overture": len(overture),
             "canonical": len(canonical),
             "matched_two_source": matched_two_source,
-            "tagged": len(tagged) - unresolved,
+            "psic_coded": psic_coded,
+            "io16_coded": io16_coded,
+            "io80_coded": io80_coded,
+            "io240_coded": io240_coded,
+            "tagged": io80_coded,
             "unresolved": unresolved,
         },
         "classification": {
-            "llm_enabled": classifier is not None,
-            "llm_model": classifier.model if classifier is not None else None,
-            "llm_base_url": classifier.base_url if classifier is not None else None,
-            "tagged_by_rule": int(method_counts.get("rule", 0)),
-            "tagged_by_llm": int(method_counts.get("llm", 0)),
-            "unresolved": int(method_counts.get("unresolved", 0)),
-            "deterministic_first": True,
-            "io80_primary": True,
-            "io16_derived_from_io80": True,
-            "io80_code_71_allowed": True,
+            "architecture": "psic-primary-hybrid-io",
+            "psic_canonical": True,
+            "llm_enabled": backend is not None,
+            "llm_model": backend.model_name if backend is not None else None,
+            "llm_base_url": backend.base_url if backend is not None else None,
+            "psic_status_counts": status_counts,
+            "psic_method_counts": method_counts,
+            "direct_io_status_counts": io_coverage["direct_status_counts"],
+            "io16": io_coverage["resolutions"]["io16"],
+            "io80": io_coverage["resolutions"]["io80"],
+            "io240": io_coverage["resolutions"]["io240"],
+            "direct_io_role": "conservative downstream resolver",
+            "direct_io_never_overrides_psic_candidate_set": True,
         },
         "osm_acquisition": {
             "provider": "Geofabrik",

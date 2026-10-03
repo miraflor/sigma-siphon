@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "sigma-siphon"
-version = "0.4.0"
-description = "Acquire, reconcile, clip, and IO-tag Philippine POIs from OSM and Overture."
+version = "0.5.0"
+description = "Acquire, reconcile, PSIC-classify, and hybrid I-O-tag Philippine POIs from OSM and Overture."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "LicenseRef-Proprietary"

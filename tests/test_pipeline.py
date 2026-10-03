@@ -78,12 +78,18 @@ def test_end_to_end_without_network(monkeypatch, tmp_path: Path):
     assert result.loc[0, "overture_name"] == "Sample Bank"
     assert result.loc[0, "overture_category"] == "bank"
 
-    # Stage 3 deliberately leaves the production IO classifier unchanged.
+    # Stage 5: PSIC is canonical and direct I-O evidence is only a resolver.
+    assert result.loc[0, "psic_code"]
+    assert result.loc[0, "direct_io80_code"] == "66"
     assert result.loc[0, "io80_code"] == "66"
+    assert result.loc[0, "io80_source"] in {"psic", "psic+direct", "direct"}
 
     assert report["counts"]["matched_two_source"] == 1
+    assert report["counts"]["psic_coded"] == 1
+    assert report["counts"]["io80_coded"] == 1
     assert "ODbL-1.0" in result.loc[0, "source_licenses"]
-    assert report["classification"]["io80_code_71_allowed"] is True
+    assert report["classification"]["architecture"] == "psic-primary-hybrid-io"
+    assert report["classification"]["psic_canonical"] is True
     assert report["licensing"]["database_license"] == "ODbL-1.0"
     assert report["licensing"]["software"] == "Proprietary"
     assert report["boundary"]["mode"] == "gpkg"

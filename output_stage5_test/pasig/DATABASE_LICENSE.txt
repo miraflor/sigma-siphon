@@ -1,0 +1,9 @@
+DATABASE LICENSE NOTICE
+
+This fused POI database is distributed under the Open Database License (ODbL) 1.0 as the project's conservative compliance posture for a reconciled database containing OpenStreetMap-derived records.
+
+OpenStreetMap attribution: © OpenStreetMap contributors.
+Geofabrik extract: https://download.geofabrik.de/asia/philippines.html
+ODbL 1.0: https://opendatacommons.org/licenses/odbl/1-0/
+
+Individual Overture-origin source content retains its applicable upstream provider terms. See ATTRIBUTION.txt and the per-row source_licenses field.
